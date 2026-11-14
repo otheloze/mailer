@@ -1,0 +1,11 @@
+{
+  "root": true,
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "ignorePatterns": [".next/", "node_modules/", "coverage/", "next-env.d.ts"],
+  "overrides": [
+    {
+      "files": ["server.js"],
+      "rules": { "@typescript-eslint/no-require-imports": "off" }
+    }
+  ]
+}

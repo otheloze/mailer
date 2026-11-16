@@ -34,7 +34,21 @@ die()  { printf 'ERR %s\n' "$*" >&2; exit 1; }
 # ---------------------------------------------------------------------------
 step "Staging source: $SRC -> $APP"
 [[ -d "$SRC" ]] || die "source mount $SRC is missing"
+# Wiping APP would destroy the repository if the two paths ever coincide.
+[[ "$APP" -ef "$SRC" ]] && die "APP ($APP) and SRC ($SRC) are the same directory"
 mkdir -p "$APP"
+
+# The build directory is a reused volume, so whatever an earlier run (or a hand
+# copy) left behind survives staging and reaches the artifact:
+#   - an .env* file, because Next only skips a .env value when process.env
+#     already defines it, so a stale .env.local would bake developer values into
+#     a production bundle even though --env-file supplies the real ones;
+#   - a source file the repository has since deleted or renamed, because the
+#     tarball below only adds and overwrites, so the stale copy is still
+#     compiled in and the build stops matching the commit it claims to be.
+# Wipe the directory instead. node_modules is kept because `npm ci` deletes and
+# reinstalls it anyway, and it is the slowest part of a run.
+find "$APP" -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} + 2>/dev/null || true
 
 # node_modules is excluded because the bind-mounted copy is a Windows install
 # (wrong platform binaries); .next because it must be produced fresh; .git

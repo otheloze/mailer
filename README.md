@@ -187,13 +187,26 @@ Vercel's normal Next.js build and deployment are sufficient; no custom cron job 
 This application requires a Node.js server; it cannot be deployed as a static site. cPanel must provide **Setup Node.js App** with Node.js 20 or later and permit a persistent Passenger application. A `server.js` entry point is included for cPanel.
 
 1. Create a Node.js application in cPanel with Node.js 20+, production mode, and an application root outside `public_html` (for example `mymailmarket-app`). Set the startup file to `server.js`.
-2. Upload the project files to the application root. Do not upload `.env.local`, `.git`, `node_modules`, or `.next` from your local machine.
-3. In the cPanel application terminal, run `npm ci` and then `npm run build`. The startup file uses cPanel's `PORT` environment variable.
-4. Add the production environment variables from `.env.example` in cPanel's Node.js application settings. Set `NEXT_PUBLIC_APP_URL=https://mymailmarket.com` and the public Supabase URL/key. Keep service-role, Resend, payment-provider, and Truehost credentials server-side. Do not upload `.env.local` or put secrets in `public_html`.
+2. Put the source in the application root (`git clone` works; the repository is anonymously clonable). Do not upload `.env.local`, `.git`, or a `node_modules`/`.next` tree built on another operating system.
+3. Install dependencies with `npm ci --include=dev`. cPanel's nodeenv npm omits dev dependencies by default, and `next.config.ts` needs `typescript` to load. The startup file uses cPanel's `PORT` environment variable.
+4. Write the production values to `<app root>/.env.production` (mode 600) instead of the Setup Node.js App environment-variable UI: `NEXT_PUBLIC_*` values are inlined at build time and an SSH build cannot see UI values. Set `NEXT_PUBLIC_APP_URL=https://mymailmarket.com` and the public Supabase URL/key. Keep service-role, Resend, payment-provider, and Truehost credentials server-side. Do not put secrets in `public_html`.
 5. Point `mymailmarket.com` to the cPanel application using the domain/application setup provided by your host, enable SSL, and restart the Node.js application.
 6. In Supabase Auth, add `https://mymailmarket.com/auth/callback` to the allowed redirect URLs. Update provider webhook URLs to the production domain, run all required Supabase migrations, and verify sign-in, a test email, and payment callbacks.
 
 Shared hosting may limit application memory, process lifetime, or outbound requests. Confirm those limits with the host. Domain search will continue to show an error until Truehost accepts the configured credentials; successful cPanel deployment does not fix a Truehost 401.
+
+### Releasing to a memory-capped account
+
+`next build` needs more than the ~1 GB LVE memory this plan allows and dies with `spawn ... EAGAIN`, so the build runs off-host in a Linux container and only `.next` is uploaded:
+
+```powershell
+# one-off pull of the production env; do not keep the copy around
+scp -P 1624 -i .ssh\deploy_ed25519 jlazxdoi@102.212.246.122:~/api/.env.production "$env:TEMP\mymailmarket.env"
+# build in node:20, upload .next, park the old build, restart, poll /api/health
+.\scripts\deploy-artifact.ps1 -EnvFile "$env:TEMP\mymailmarket.env"
+```
+
+`scripts/build-artifact.sh` runs inside the container and builds at the server's absolute path so no container path leaks into the output; `scripts/deploy-artifact.ps1` orchestrates the build, upload, and activation. If the health check fails, the deployer recycles the app instance once, then restores the parked build and exits non-zero, leaving the failed build as `.next.failed-*`. A restarted instance can keep answering `503` until it is recycled, so the deployer never trusts `touch tmp/restart.txt` on its own. `scripts/pin-app-pool.sh` keeps the app on a single warm instance so the memory cap cannot cause failed forks; re-run it after any change in **Setup Node.js App**, because cPanel rewrites `public_html/.htaccess`.
 
 ## Useful commands
 

@@ -2,7 +2,8 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, LoaderCircle, XCircle } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CheckCircle2, LoaderCircle, XCircle } from "lucide-react";
+import { HOSTING_STORE_URL } from "@/components/site-chrome";
 
 type DomainSearchResult = {
   domain: string;
@@ -82,21 +83,42 @@ export function DomainSearchPreview({ initialDomain = "", buyPage = false }: { i
               )}
               {result.available && result.pricing.length === 0 && <p className="mt-2 text-[14px] text-[#64748b]">The provider did not return a registration price.</p>}
               {result.available && result.pricing.length === 1 && <p className="mt-2 text-[14px] text-[#64748b]">Only the provider currency is available right now; the second currency could not be converted.</p>}
-              {result.available && !buyPage && (
-                <Link href={`/domains/buy?domain=${encodeURIComponent(result.domain)}`} className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-semibold text-[#1d4ed8] hover:underline">
-                  View domain quote <ArrowRight size={14} />
-                </Link>
-              )}
               {result.available && buyPage && (
                 <p className="mt-3 text-[14px] leading-5 text-[#64748b]">Domain checkout is not enabled yet, so this search will not charge you or register the domain.</p>
               )}
               {result.fxUpdatedAt && <p className="mt-2 text-[13px] leading-5 text-[#94a3b8]">USD/NGN conversion uses indicative exchange rates updated {formatDate(result.fxUpdatedAt)}.</p>}
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                {/* Hosting is bought in the store, so the searched name and its quote travel with the visitor. */}
+                <a href={hostingStoreUrl(result)} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#102a43] px-4 text-[14px] font-semibold text-white transition hover:bg-[#173b66]">
+                  Get hosting <ArrowUpRight size={14} />
+                </a>
+                {result.available && !buyPage && (
+                  <Link href={`/domains/buy?domain=${encodeURIComponent(result.domain)}`} className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[#1d4ed8] hover:underline">
+                    View domain quote <ArrowRight size={14} />
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
     </form>
   );
+}
+
+function hostingStoreUrl(result: DomainSearchResult) {
+  const url = new URL(HOSTING_STORE_URL);
+  // WHMCS reads `domain`/`query` to prefill its domain search; the rest tells the
+  // store what this visitor was quoted here, so the two pages cannot disagree.
+  url.searchParams.set("domain", result.domain);
+  url.searchParams.set("query", result.domain);
+  url.searchParams.set("available", result.available ? "true" : "false");
+  const quote = result.pricing[0];
+  if (quote) {
+    url.searchParams.set("domain_price", quote.amount.toFixed(2));
+    url.searchParams.set("domain_currency", quote.currency);
+  }
+  return url.toString();
 }
 
 function formatCurrency(amount: number, currency: string) {

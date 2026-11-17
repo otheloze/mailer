@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, Zap } from "lucide-react";
+import { ArrowUpRight, Flame, Zap } from "lucide-react";
+import { HOSTING_STORE_URL } from "@/lib/links";
 
-export const HOSTING_STORE_URL = "https://my.mymailmarket.com/client/store";
+export { HOSTING_STORE_URL };
 
 const navItems: { label: string; href: string; external?: boolean }[] = [
   { label: "Products", href: "/products" },
@@ -26,6 +27,18 @@ function NavLink({ item, className, activeClassName }: { item: typeof navItems[n
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-[#e4e9f1]/80 bg-white/85 backdrop-blur-xl">
+      {/* Sits inside the sticky header so the bar and nav travel together and no
+          page has to compensate for an extra offset. */}
+      <a
+        href={HOSTING_STORE_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="group flex items-center justify-center gap-2 bg-gradient-to-r from-[#1b0f05] via-[#3a1d07] to-[#1b0f05] px-4 py-2 text-center text-[11.5px] font-medium leading-4 text-[#ffd9b8] transition hover:text-white sm:text-[12.5px]"
+      >
+        <Flame size={13} className="shrink-0 text-[#ff8a3d]" />
+        <span className="truncate">Black Friday: one year of domain and hosting — NGN 20,000 or USD 16</span>
+        <span className="hidden shrink-0 font-semibold underline underline-offset-2 group-hover:no-underline sm:inline">Ends 31 Dec · Claim the deal</span>
+      </a>
       <div className="mx-auto flex h-[68px] max-w-[1320px] items-center justify-between px-5 sm:px-8 lg:px-10">
         <Link href="/" className="flex items-center gap-2.5 text-[17px] font-semibold tracking-[-.045em] text-[#111c34] sm:text-[19px]">
           <span className="grid size-9 place-items-center rounded-[12px] bg-gradient-to-br from-[#78a8ff] to-[#4057db] text-white shadow-[0_8px_20px_-8px_rgba(70,100,220,.65)] sm:size-10"><Zap size={17} fill="currentColor" /></span>

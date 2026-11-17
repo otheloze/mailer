@@ -3,6 +3,7 @@ import Image from "next/image";
 import { ArrowLeft, ArrowUpRight, Globe2, ShieldCheck } from "lucide-react";
 import { DomainSearchPreview } from "@/components/domain-search-preview";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
+import { HOSTING_STORE_URL } from "@/lib/links";
 
 export const metadata = {
   title: "Domain search and pricing | MYMAILMARKET",
@@ -63,7 +64,7 @@ export default async function BuyDomainPage({ searchParams }: { searchParams: Pr
             </ul>
             <div className="mt-6 border-t border-[#e8edf4] pt-5">
               <p className="text-[13px] font-semibold text-[#111827]">Looking for web hosting?</p>
-              <a href="https://my.mymailmarket.com/client/store" target="_blank" rel="noreferrer" className="mt-3 inline-flex h-10 items-center gap-2 rounded-xl bg-[#102a43] px-4 text-[13px] font-semibold text-white transition hover:bg-[#173b66]">
+              <a href={HOSTING_STORE_URL} target="_blank" rel="noreferrer" className="mt-3 inline-flex h-10 items-center gap-2 rounded-xl bg-[#102a43] px-4 text-[13px] font-semibold text-white transition hover:bg-[#173b66]">
                 Visit hosting store <ArrowUpRight size={13} />
               </a>
             </div>

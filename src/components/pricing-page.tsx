@@ -5,7 +5,7 @@ import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
 import { ArrowRight, ArrowUpRight, Flame, LoaderCircle, LockKeyhole, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { HOSTING_STORE_URL } from "@/lib/links";
+import { BLACK_FRIDAY_PROMO, isPromoActive } from "@/lib/promo";
 import { PackagePricingCards, type SubscriptionPackage } from "@/components/package-pricing-cards";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { requestCheckout, type PaymentProvider } from "@/components/payment-buttons";
@@ -151,8 +151,8 @@ export function PricingPage({ packages, loadError, callback }: { packages: Subsc
 
         {/* Hosting is sold in the separate client-area store, so the bundle is
             promoted here where purchase intent is highest rather than priced. */}
-        <a
-          href={HOSTING_STORE_URL}
+        {isPromoActive() && <a
+          href={BLACK_FRIDAY_PROMO.href}
           target="_blank"
           rel="noreferrer"
           className="group mt-5 flex flex-col gap-3 rounded-2xl border border-[#f2d5bb] bg-[#fff8f2] px-5 py-4 text-[#3a1d08] transition hover:border-[#e8a86f] hover:bg-[#fff2e6] sm:flex-row sm:items-center sm:justify-between"
@@ -160,12 +160,14 @@ export function PricingPage({ packages, loadError, callback }: { packages: Subsc
           <div className="flex items-center gap-3">
             <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#ffe4cc] text-[#c2410c]"><Flame size={17} /></span>
             <div>
-              <div className="text-[14px] font-semibold">Black Friday: one year of domain and hosting</div>
-              <div className="mt-0.5 text-[12px] leading-4 text-[#8a5a33]">NGN 20,000 in Nigeria · USD 16 internationally. Sale ends 31 December.</div>
+              <div className="text-[14px] font-semibold">Black Friday: {BLACK_FRIDAY_PROMO.headline.toLowerCase()}</div>
+              <div className="mt-0.5 text-[12px] leading-4 text-[#8a5a33]">
+                {BLACK_FRIDAY_PROMO.prices.map(({ label, currency, price }) => `${currency} ${price} ${label === "Nigeria" ? "in Nigeria" : "internationally"}`).join(" · ")}. Sale ends {BLACK_FRIDAY_PROMO.endsLabel}.
+              </div>
             </div>
           </div>
           <span className="inline-flex h-9 w-fit shrink-0 items-center gap-1.5 rounded-full bg-[#c2410c] px-4 text-[13px] font-semibold text-white transition group-hover:bg-[#9a3412]">Claim the deal <ArrowUpRight size={13} /></span>
-        </a>
+        </a>}
 
         {loadError && <div role="alert" className="mx-auto mt-8 max-w-3xl rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-xs text-red-800">{loadError}</div>}
         {!loadError && packages.length === 0 && <div role="status" className="mx-auto mt-8 max-w-3xl rounded-xl border border-[#dbe4f1] bg-white px-4 py-5 text-center text-xs text-[#64748b]">No packages are available right now.</div>}

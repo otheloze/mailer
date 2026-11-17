@@ -15,6 +15,7 @@ import { DomainSearchPreview } from "@/components/domain-search-preview";
 import { HomePackagePricing } from "@/components/home-package-pricing";
 import { SubscribeForm } from "@/components/subscribe-form";
 import { HOSTING_STORE_URL } from "@/lib/links";
+import { BLACK_FRIDAY_PROMO, isPromoActive } from "@/lib/promo";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { SubscriptionPackage } from "@/components/package-pricing-cards";
@@ -59,7 +60,7 @@ const products = [
     icon: Globe2,
     title: "Claim your corner of the web",
     description: "Find a memorable domain for your brand, then keep renewals and domain details together.",
-    features: ["Truehost availability search", "USD and NGN quotes", "30% service markup"],
+    features: ["Popular extensions", "USD and NGN quotes", "Fast availability check"],
     href: "/domains/buy",
     cta: "Search domains",
     color: "bg-[#e7eef8] text-[#294b7a]",
@@ -70,6 +71,7 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const { packages, loadError } = await loadHomePackages();
+  const promoActive = isPromoActive();
   return (
     <main className="min-h-screen overflow-hidden bg-[#f4f6fa] text-[#101828]">
       <SiteHeader />
@@ -103,54 +105,60 @@ export default async function HomePage() {
         <div className="enter-up-delay relative mx-auto w-full max-w-[620px] md:justify-self-end">
           <div className="absolute -right-8 -top-8 size-40 rounded-full bg-[#b7cbff]/60 blur-3xl sm:size-56" />
           <div className="absolute -bottom-8 -left-8 size-40 rounded-full bg-[#d8b8aa]/35 blur-3xl" />
-          <a
-            href={HOSTING_STORE_URL}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Black Friday sale: one year of domain and hosting for NGN 20,000 or USD 16. Ends 31 December. Open the store."
-            className="group relative block overflow-hidden rounded-[28px] border border-[#2b1a10] bg-[#0d0b0a] shadow-[0_38px_100px_-42px_rgba(19,35,74,.55)] transition hover:-translate-y-0.5 hover:shadow-[0_44px_110px_-42px_rgba(19,35,74,.6)] sm:rounded-[34px]"
-          >
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,26,.3),transparent_58%)]" />
-            <div className="pointer-events-none absolute -left-20 bottom-0 size-64 rounded-full bg-[#ff7a1a]/15 blur-3xl" />
-            <div className="relative p-6 sm:p-8">
-              <div className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-2 rounded-full border border-[#ff7a1a]/40 bg-[#ff7a1a]/12 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.18em] text-[#ffb27a]">
-                  <Flame size={13} /> Black Friday sale
+          {promoActive ? (
+            <a
+              href={BLACK_FRIDAY_PROMO.href}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`${BLACK_FRIDAY_PROMO.label}: ${BLACK_FRIDAY_PROMO.headline.toLowerCase()} for ${BLACK_FRIDAY_PROMO.prices.map(({ currency, price }) => `${currency} ${price}`).join(" or ")}. Ends ${BLACK_FRIDAY_PROMO.endsLabel}. Open the store.`}
+              className="group image-zoom relative block aspect-[.82] overflow-hidden rounded-[28px] border border-white/80 bg-[#26395f] shadow-[0_38px_100px_-42px_rgba(19,35,74,.45)] transition hover:-translate-y-0.5 hover:shadow-[0_44px_110px_-42px_rgba(19,35,74,.55)] sm:aspect-[1.08] sm:rounded-[34px]"
+            >
+              <HeroPhoto />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0d0b0a]/95 via-[#0d0b0a]/35 to-[#101a31]/5" />
+              <div className="absolute left-4 right-4 top-4 flex items-center justify-between sm:left-6 sm:right-6 sm:top-6">
+                <span className="inline-flex items-center gap-2 rounded-full border border-[#ff7a1a]/50 bg-[#1a0d04]/60 px-3 py-2 text-[11px] font-bold uppercase tracking-[.16em] text-[#ffb27a] backdrop-blur-md">
+                  <Flame size={13} /> {BLACK_FRIDAY_PROMO.label}
                 </span>
-                <span className="rounded-full border border-white/15 bg-white/[.06] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.14em] text-white/55">Ends 31 December</span>
+                <span className="grid size-9 place-items-center rounded-full border border-white/25 bg-white/15 text-white backdrop-blur-md transition group-hover:bg-white/25"><ArrowUpRight size={16} /></span>
               </div>
-              <h2 className="mt-6 text-[29px] font-semibold leading-[1.02] tracking-[-.055em] text-white sm:text-[37px]">
-                One year of domain<br />and hosting, for less.
-              </h2>
-              <p className="mt-3 max-w-[370px] text-[13px] leading-6 text-white/60 sm:text-[14px]">
-                Our Black Friday bundle gives you a domain plus twelve months of web hosting in one price. Pick your currency and launch your site.
-              </p>
-              <div className="mt-6 grid gap-2.5 sm:grid-cols-2">
-                {[
-                  { label: "Nigeria", currency: "NGN", price: "20,000" },
-                  { label: "International", currency: "USD", price: "16" },
-                ].map(({ label, currency, price }) => (
-                  <div key={currency} className="rounded-2xl border border-white/12 bg-white/[.055] p-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[.16em] text-[#ffb27a]">{label}</div>
-                    <div className="mt-2 flex items-end gap-1.5">
-                      <span className="pb-1 text-[12px] font-semibold text-white/55">{currency}</span>
-                      <span className="text-[30px] font-semibold leading-none tracking-[-.05em] text-white">{price}</span>
-                    </div>
-                    <div className="mt-2 text-[12px] leading-4 text-white/50">One year domain + hosting</div>
+              <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6">
+                <div className="rounded-[20px] border border-white/15 bg-[#0d0b0a]/75 p-4 text-white shadow-2xl backdrop-blur-xl sm:p-5">
+                  <div className="text-[11px] font-semibold uppercase tracking-[.16em] text-[#ffb27a]">Promo · now until {BLACK_FRIDAY_PROMO.endsLabel}</div>
+                  <h2 className="mt-2 text-[21px] font-semibold leading-tight tracking-[-.04em] sm:text-[27px]">{BLACK_FRIDAY_PROMO.headline} for one price.</h2>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    {BLACK_FRIDAY_PROMO.prices.map(({ label, currency, price }) => (
+                      <div key={currency} className="rounded-xl border border-white/12 bg-white/[.07] px-3 py-2.5">
+                        <div className="text-[10px] font-semibold uppercase tracking-[.14em] text-white/55">{label}</div>
+                        <div className="mt-1 flex items-end gap-1"><span className="pb-0.5 text-[11px] font-semibold text-white/60">{currency}</span><span className="text-[24px] font-semibold leading-none tracking-[-.05em] sm:text-[28px]">{price}</span></div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                  <span className="mt-4 flex h-11 w-fit items-center gap-2 rounded-full bg-gradient-to-r from-[#ff8a3d] to-[#f2610c] px-5 text-[14px] font-semibold text-[#1a1004] shadow-[0_16px_34px_-18px_rgba(255,122,26,.85)] transition group-hover:brightness-105">
+                    Claim the deal <ArrowUpRight size={15} />
+                  </span>
+                </div>
               </div>
-              <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-[12px] font-medium text-white/60">
-                <span className="inline-flex items-center gap-1.5"><Check size={12} className="text-[#ffb27a]" /> Domain included</span>
-                <span className="inline-flex items-center gap-1.5"><Check size={12} className="text-[#ffb27a]" /> 12 months hosting</span>
-                <span className="inline-flex items-center gap-1.5"><Check size={12} className="text-[#ffb27a]" /> No setup fee</span>
+            </a>
+          ) : (
+            <div className="image-zoom relative aspect-[1.08] overflow-hidden rounded-[28px] border border-white/80 bg-[#26395f] shadow-[0_38px_100px_-42px_rgba(19,35,74,.45)] sm:aspect-[1.14] sm:rounded-[34px]">
+              <HeroPhoto />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#101a31]/90 via-[#101a31]/10 to-[#101a31]/5" />
+              <div className="absolute left-4 right-4 top-4 sm:left-6 sm:right-6 sm:top-6">
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-[#111b32]/35 px-3 py-2 text-[12px] font-semibold text-white backdrop-blur-md">
+                  <span className="size-1.5 rounded-full bg-[#9bb8ff]" /> The modern growth toolkit
+                </span>
               </div>
-              <span className="mt-6 flex h-12 w-fit items-center gap-2 rounded-full bg-gradient-to-r from-[#ff8a3d] to-[#f2610c] px-6 text-[14px] font-semibold text-[#1a1004] shadow-[0_16px_34px_-18px_rgba(255,122,26,.85)] transition group-hover:brightness-105">
-                Claim the Black Friday deal <ArrowUpRight size={15} />
-              </span>
-              <p className="mt-3 text-[11px] leading-4 text-white/35">Sale ends 31 December. Offer applies to a one-year domain and hosting bundle.</p>
+              <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6">
+                <div className="max-w-[410px] rounded-[20px] border border-white/20 bg-[#111a2e]/65 p-4 text-white shadow-2xl backdrop-blur-xl sm:p-5">
+                  <div className="text-[12px] font-semibold uppercase tracking-[.18em] text-[#bdcdf8]">A better way to grow</div>
+                  <h2 className="mt-2 text-[20px] font-semibold leading-tight tracking-[-.04em] sm:text-[25px]">From first prospect to lasting customer.</h2>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {["Discover", "Connect", "Grow"].map((item) => <span key={item} className="rounded-full border border-white/15 bg-white/[.08] px-2.5 py-1 text-[11px] font-medium text-white/85">{item}</span>)}
+                  </div>
+                </div>
+              </div>
             </div>
-          </a>
+          )}
         </div>
       </section>
 
@@ -245,6 +253,19 @@ export default async function HomePage() {
 
       <SiteFooter />
     </main>
+  );
+}
+
+function HeroPhoto() {
+  return (
+    <Image
+      src="/images/team-workspace.jpg"
+      alt="A diverse team of professionals collaborating around a laptop in a bright modern office"
+      fill
+      priority
+      sizes="(max-width: 768px) 100vw, 55vw"
+      className="object-cover"
+    />
   );
 }
 

@@ -123,7 +123,10 @@ export default async function HomePage() {
               </div>
               <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6">
                 <div className="rounded-[20px] border border-white/15 bg-[#0d0b0a]/75 p-4 text-white shadow-2xl backdrop-blur-xl sm:p-5">
-                  <div className="text-[11px] font-semibold uppercase tracking-[.16em] text-[#ffb27a]">Promo · now until {BLACK_FRIDAY_PROMO.endsLabel}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-md bg-gradient-to-r from-[#ff8a3d] to-[#f2610c] px-2.5 py-1 text-[13px] font-extrabold uppercase tracking-[.12em] text-[#1a1004] sm:text-[14px]">Promo</span>
+                    <span className="text-[13px] font-semibold text-white sm:text-[14px]">Now until {BLACK_FRIDAY_PROMO.endsLabel}</span>
+                  </div>
                   <h2 className="mt-2 text-[21px] font-semibold leading-tight tracking-[-.04em] sm:text-[27px]">{BLACK_FRIDAY_PROMO.headline} for one price.</h2>
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     {BLACK_FRIDAY_PROMO.prices.map(({ label, currency, price }) => (

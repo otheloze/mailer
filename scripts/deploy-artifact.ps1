@@ -270,7 +270,7 @@ else
   echo "no parked build to restore"
 fi
 '@
-    Send-RemoteScript -Name "mm-rollback.sh" -Body $rollbackScript
+    Send-RemoteScript -Name "mm-rollback.sh" -Body $rollbackScript.Replace("__APP_ROOT__", $AppRoot)
     Write-Host "`n--- last entries in $AppRoot/stderr.log" -ForegroundColor Yellow
     & ssh -p $Port -i $keyPath $Remote "tail -n 30 '$AppRoot/stderr.log'"
     Die "deployment rolled back: $healthUrl never returned ok (new build kept as .next.failed-*)"

@@ -13,6 +13,7 @@ export async function middleware(request: NextRequest) {
     || request.nextUrl.pathname.startsWith("/subscribe")
     || request.nextUrl.pathname.startsWith("/api/billing")
     || request.nextUrl.pathname.startsWith("/login")
+    || request.nextUrl.pathname.startsWith("/forgot-password")
     || request.nextUrl.pathname.startsWith("/auth")
     || request.nextUrl.pathname.startsWith("/unsubscribe")
     || request.nextUrl.pathname.startsWith("/api/webhooks")

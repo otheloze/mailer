@@ -57,7 +57,11 @@ function Die  { param([string]$Message) Write-Host "ERR $Message" -ForegroundCol
 
 function Invoke-Native {
     param([string]$Exe, [string[]]$CmdArgs, [string]$What)
-    & $Exe @CmdArgs
+    # Windows PowerShell 5.1 turns native stderr (e.g. "npm notice") into a
+    # terminating error under $ErrorActionPreference = "Stop"; judge by exit code.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try { & $Exe @CmdArgs } finally { $ErrorActionPreference = $previous }
     if ($LASTEXITCODE -ne 0) { Die "$What failed (exit $LASTEXITCODE)" }
 }
 
@@ -148,7 +152,8 @@ function Send-RemoteScript {
     Invoke-Native -Exe "scp" -What "$Name upload" -CmdArgs @(
         "-P", "$Port", "-i", $keyPath, $localPath, "${Remote}:$remotePath"
     )
-    & ssh -p $Port -i $keyPath $Remote "bash $remotePath"
+    $prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    try { & ssh -p $Port -i $keyPath $Remote "bash $remotePath" } finally { $ErrorActionPreference = $prevEap }
     $script:RemoteExit = $LASTEXITCODE
     Remove-Item $localPath -Force -ErrorAction SilentlyContinue
 }
@@ -272,6 +277,7 @@ fi
 '@
     Send-RemoteScript -Name "mm-rollback.sh" -Body $rollbackScript.Replace("__APP_ROOT__", $AppRoot)
     Write-Host "`n--- last entries in $AppRoot/stderr.log" -ForegroundColor Yellow
+    $ErrorActionPreference = "Continue"
     & ssh -p $Port -i $keyPath $Remote "tail -n 30 '$AppRoot/stderr.log'"
     Die "deployment rolled back: $healthUrl never returned ok (new build kept as .next.failed-*)"
 }
@@ -280,6 +286,7 @@ fi
 # 6. Tidy up
 # ---------------------------------------------------------------------------
 Step "Cleaning up"
+$ErrorActionPreference = "Continue"
 & ssh -p $Port -i $keyPath $Remote "rm -f '$RemoteTgz' /tmp/mm-activate.sh /tmp/mm-recycle.sh /tmp/mm-rollback.sh; rm -rf '$AppRoot'/.next.stale-*; echo cleaned" | Out-Null
 if (-not $ArtifactPath -and (Test-Path $LocalTgz)) { Remove-Item $LocalTgz -Force }
 Ok "Removed remote tarball and parked builds"

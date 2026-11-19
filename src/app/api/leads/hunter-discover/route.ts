@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { reserveCredits, settleCredits } from "@/lib/credits";
+import { claimTrial, getTrialStatus, releaseTrial, TRIAL_DISCOVERY_RESULTS, TRIAL_USED_MESSAGE } from "@/lib/trial";
 
 const requestSchema = z.object({
   query: z.string().trim().min(2).max(2000),
@@ -44,9 +45,24 @@ export async function POST(request: Request) {
 
   const apiKey = process.env.HUNTER_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "Company discovery is not configured." }, { status: 503 });
+  // Accounts without a subscription get one free discovery, capped at a few results.
+  const trial = await getTrialStatus(supabase);
+  const isTrial = Boolean(trial && !trial.has_full_access);
+  const limit = isTrial ? Math.min(parsed.data.limit, TRIAL_DISCOVERY_RESULTS) : parsed.data.limit;
   const reservationKey = `company-discovery:${user.id}:${crypto.randomUUID()}`;
-  const reservation = await reserveCredits(supabase, "email_discovery", parsed.data.limit, reservationKey, "Company discovery");
-  if (reservation.error) return NextResponse.json({ error: reservation.error }, { status: /credit|subscription|account/i.test(reservation.error) ? 402 : 500 });
+  if (isTrial) {
+    if (!trial?.trial_eligible || !trial.discovery_available) return NextResponse.json({ error: TRIAL_USED_MESSAGE, code: "trial_used" }, { status: 402 });
+    const claim = await claimTrial(supabase, "discovery");
+    if (claim.error) return NextResponse.json({ error: claim.error }, { status: 500 });
+    if (!claim.granted) return NextResponse.json({ error: TRIAL_USED_MESSAGE, code: "trial_used" }, { status: 402 });
+  } else {
+    const reservation = await reserveCredits(supabase, "email_discovery", limit, reservationKey, "Company discovery");
+    if (reservation.error) return NextResponse.json({ error: reservation.error }, { status: /credit|subscription|account/i.test(reservation.error) ? 402 : 500 });
+  }
+  // Settles paid credits, or for a trial gives the free discovery back when nothing was delivered.
+  const settle = (consumed: number) => isTrial
+    ? (consumed === 0 ? releaseTrial(user.id, "discovery") : Promise.resolve(null))
+    : settleCredits(user.id, reservationKey, consumed);
 
   let response: Response;
   try {
@@ -56,12 +72,12 @@ export async function POST(request: Request) {
         "X-API-KEY": apiKey,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ query: parsed.data.query, limit: parsed.data.limit }),
+      body: JSON.stringify({ query: parsed.data.query, limit }),
       cache: "no-store",
       signal: AbortSignal.timeout(20000),
     });
   } catch {
-    const refundError = await settleCredits(user.id, reservationKey, 0);
+    const refundError = await settle(0);
     return NextResponse.json({ error: `Company discovery is temporarily unavailable. Please try again.${refundError ? ` Credit release failed: ${refundError}` : ""}` }, { status: refundError ? 500 : 502 });
   }
 
@@ -71,19 +87,19 @@ export async function POST(request: Request) {
     const message = response.status === 401 ? "Company discovery rejected its configured credentials."
       : response.status === 429 || response.status === 403 ? "Company discovery usage or rate limit reached."
       : providerMessage ?? "Could not complete company discovery.";
-    const refundError = await settleCredits(user.id, reservationKey, 0);
+    const refundError = await settle(0);
     return NextResponse.json({ error: `${message}${refundError ? ` Credit release failed: ${refundError}` : ""}` }, { status: refundError ? 500 : response.status === 429 ? 429 : 502 });
   }
 
   const companies = result.data.filter((company) =>
     typeof company.domain === "string" && company.domain.length > 0 && company.domain.length <= 253);
-  const settlementError = await settleCredits(user.id, reservationKey, companies.length);
+  const settlementError = await settle(companies.length);
   if (settlementError) return NextResponse.json({ error: `Discovery completed but credit settlement failed: ${settlementError}` }, { status: 500 });
 
   return NextResponse.json({
     companies,
     results: result.meta?.results ?? companies.length,
-    limit: result.meta?.limit ?? parsed.data.limit,
+    limit: result.meta?.limit ?? limit,
     query: parsed.data.query,
   });
 }

@@ -8,6 +8,8 @@ import { hasCampaignBodyContent, renderCampaignEmail } from "@/lib/render-email"
 import { refundSettledCredits, reserveCredits, settleCredits } from "@/lib/credits";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { getAllowedSenderDomains, isDomainAllowed, senderDomainError } from "@/lib/sender-domains";
+import { claimTrial, getTrialStatus, releaseTrial, TRIAL_USED_MESSAGE } from "@/lib/trial";
+import { sendViaSmtp, smtpConfigured } from "@/lib/mailer";
 import { loadEligibleAddresses, reconcileSegment, storeResendContactId } from "@/lib/segments";
 
 // Large audiences require Segment reconciliation before sending; allow up to 5 minutes (Vercel Pro).
@@ -23,9 +25,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!supabase) return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  if (!process.env.RESEND_API_KEY) return NextResponse.json({ error: "Configure RESEND_API_KEY before sending." }, { status: 503 });
   const input = schema.safeParse(await request.json().catch(() => ({})));
   if (!input.success) return NextResponse.json({ error: input.error.issues[0]?.message ?? "Invalid send request." }, { status: 400 });
+  // Accounts without a subscription get one free test email, sent over SMTP instead of Resend.
+  const trialStatus = input.data.testEmail ? await getTrialStatus(supabase) : null;
+  const isTrialSend = Boolean(trialStatus && !trialStatus.has_full_access);
+  if (!isTrialSend && !process.env.RESEND_API_KEY) return NextResponse.json({ error: "Configure RESEND_API_KEY before sending." }, { status: 503 });
   const { id } = await params;
   const { data: campaign, error } = await supabase.from("campaigns").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -33,6 +38,37 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { domains: senderDomains, error: domainLookupError } = await getAllowedSenderDomains(supabase, user.id);
   if (domainLookupError) return NextResponse.json({ error: domainLookupError }, { status: 500 });
+
+  if (input.data.testEmail && isTrialSend) {
+    const limited = await rateLimitResponse(`test-send:${user.id}`, 10, 3600);
+    if (limited) return limited;
+    if (!trialStatus?.trial_eligible || !trialStatus.test_email_available) return NextResponse.json({ error: TRIAL_USED_MESSAGE, code: "trial_used" }, { status: 402 });
+    if (!smtpConfigured()) return NextResponse.json({ error: "Trial test emails are not available right now. Please contact support." }, { status: 503 });
+    if (!campaign.subject || !campaign.html) return NextResponse.json({ error: "Add a subject and email design before sending a test." }, { status: 400 });
+    if (!hasCampaignBodyContent(campaign.html)) return NextResponse.json({ error: "Add visible content to the email body before sending a test." }, { status: 400 });
+    // Trial tests may only go to the account's own address.
+    const ownEmail = user.email?.toLowerCase();
+    if (!ownEmail || input.data.testEmail !== ownEmail) return NextResponse.json({ error: `During the free trial, test emails can only be sent to your account email (${user.email}).` }, { status: 403 });
+    const claim = await claimTrial(supabase, "test_email");
+    if (claim.error) return NextResponse.json({ error: claim.error }, { status: 500 });
+    if (!claim.granted) return NextResponse.json({ error: TRIAL_USED_MESSAGE, code: "trial_used" }, { status: 402 });
+    try {
+      const html = await renderCampaignEmail({ html: campaign.html, previewText: campaign.preview_text, companyName: null, mailingAddress: "" });
+      const id = await sendViaSmtp({
+        to: ownEmail,
+        subject: `[Test] ${campaign.subject}`,
+        html: html.replaceAll("{{{RESEND_UNSUBSCRIBE_URL}}}", `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/unsubscribe`),
+        text: campaign.text_content || undefined,
+        replyTo: campaign.reply_to || undefined,
+        fromName: campaign.from_name || undefined,
+      });
+      return NextResponse.json({ accepted: true, id, trial: true });
+    } catch (error) {
+      await releaseTrial(user.id, "test_email");
+      console.error("Trial test email failed:", error instanceof Error ? error.message : error);
+      return NextResponse.json({ error: "The test email could not be sent. Your free test has not been used; please try again." }, { status: 502 });
+    }
+  }
 
   if (input.data.testEmail) {
     const limited = await rateLimitResponse(`test-send:${user.id}`, 10, 3600);

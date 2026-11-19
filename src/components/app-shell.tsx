@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/client";
+import { mustSubscribe, trialSummary, type TrialStatus } from "@/lib/trial-shared";
 
 const primary = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
@@ -34,6 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [search, setSearch] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [accountEmail, setAccountEmail] = useState("");
+  const [trial, setTrial] = useState<TrialStatus | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -42,8 +44,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setIsAdmin(data.user?.app_metadata?.role === "admin");
       setAccountEmail(data.user?.email ?? "");
     });
+    void createClient().rpc("get_trial_status").then(({ data, error }) => {
+      if (active && !error && data) setTrial(data as TrialStatus);
+    });
     return () => { active = false; };
-  }, []);
+  }, [pathname]);
 
   // Restore the saved theme (or the system preference) on first load.
   useEffect(() => {
@@ -76,7 +81,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const initials = (accountEmail.split("@")[0] || "MM").replace(/[^a-z0-9]/gi, "").slice(0, 2).toUpperCase() || "MM";
 
   const sidebar = (
-    <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-white/[.08] bg-[#111b32] px-4 py-5 text-white shadow-[18px_0_48px_-36px_rgba(9,20,45,.45)]">
+    <aside className="flex h-dvh w-[260px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-white/[.08] bg-[#111b32] px-4 py-5 text-white shadow-[18px_0_48px_-36px_rgba(9,20,45,.45)]">
       <Link href="/dashboard" className="mb-7 flex items-center gap-3 px-1.5">
         <div className="grid size-10 place-items-center rounded-[14px] bg-gradient-to-br from-[#8ab7ff] via-[#5279f3] to-[#4051d9] text-white shadow-[0_8px_24px_-8px_rgba(91,132,255,.75)]">
           <Send size={17} strokeWidth={2.2} />
@@ -87,6 +92,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <ChevronsUpDown size={15} className="ml-auto text-white/35" />
       </Link>
+      <div className="flex-1 pb-3">
       <Link href="/campaigns/compose" onClick={() => setMobileOpen(false)} className="mb-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#4a68d8] to-[#5b7cf0] text-[14px] font-semibold text-white shadow-[0_10px_24px_-12px_rgba(91,132,255,.9)] transition hover:brightness-110">
         <PenSquare size={16} /> Compose
       </Link>
@@ -121,13 +127,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         ))}
       </nav>
-      <div className="mt-auto">
+      </div>
+      <div className="shrink-0">
         <Link href="/settings" className="flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] text-white/60 transition hover:bg-white/[.07] hover:text-white">
           <Settings2 size={16} strokeWidth={1.8} className="text-white/45" /> Settings
         </Link>
-        <a href="https://resend.com/docs" target="_blank" rel="noreferrer" className="flex h-10 items-center gap-3 rounded-xl px-3 text-left text-[14px] text-white/60 transition hover:bg-white/[.07] hover:text-white">
+        <Link href="/contact" onClick={() => setMobileOpen(false)} className="flex h-10 items-center gap-3 rounded-xl px-3 text-left text-[14px] text-white/60 transition hover:bg-white/[.07] hover:text-white">
           <CircleHelp size={16} strokeWidth={1.8} className="text-white/45" /> Help & support
-        </a>
+        </Link>
         <div className="mt-4 flex items-center border-t border-white/[.1] pt-4">
           <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#f0c99a] to-[#bf8c66] text-[13px] font-bold text-[#3c2531]">{initials}</div>
           <div className="ml-2.5 min-w-0"><div className="truncate text-[14px] font-medium text-white/90" title={accountEmail}>{accountEmail || "Your workspace"}</div><div className="text-[12px] text-white/40">{isAdmin ? "Administrator" : "Account"}</div></div>
@@ -153,6 +160,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div title={accountEmail} className="ml-2 hidden size-9 place-items-center rounded-xl border border-[#e6eaf1] bg-gradient-to-br from-white to-[#e9eef8] text-[13px] font-bold text-[#52658b] shadow-sm dark:border-white/10 dark:from-[#263d68] dark:to-[#1d3157] dark:text-[#bcd0ff] sm:grid">{initials}</div>
           </div>
         </header>
+        {trial?.trial_eligible && <div className="border-b border-[#dbe4fb] bg-[#eef3ff] px-5 py-2.5 text-[13px] text-[#2f4a9e] dark:border-white/[.08] dark:bg-[#17233d] dark:text-[#b8cbff] sm:px-8">
+          <strong className="font-semibold">Free trial:</strong> {trialSummary(trial)}.{" "}
+          <Link href="/subscriptions" className="font-semibold underline underline-offset-2">{mustSubscribe(trial) ? "Choose a plan to continue" : "See plans"}</Link>
+        </div>}
         <main className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10">{children}</main>
       </div>
       {searchOpen && <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[15vh]" onMouseDown={(event) => { if (event.target === event.currentTarget) setSearchOpen(false); }}>

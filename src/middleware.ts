@@ -1,5 +1,9 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { mustSubscribe, type TrialStatus } from "@/lib/trial-shared";
+
+// Pages a user can still open after the free trial is used up (the API enforces its own limits).
+const TRIAL_ENDED_ALLOWED = ["/subscriptions", "/settings", "/reset-password"];
 
 export async function middleware(request: NextRequest) {
   const isPublic = request.nextUrl.pathname === "/"
@@ -13,11 +17,15 @@ export async function middleware(request: NextRequest) {
     || request.nextUrl.pathname.startsWith("/subscribe")
     || request.nextUrl.pathname.startsWith("/api/billing")
     || request.nextUrl.pathname.startsWith("/login")
+    || request.nextUrl.pathname.startsWith("/signup")
     || request.nextUrl.pathname.startsWith("/forgot-password")
     || request.nextUrl.pathname.startsWith("/auth")
     || request.nextUrl.pathname.startsWith("/unsubscribe")
     || request.nextUrl.pathname.startsWith("/api/webhooks")
     || request.nextUrl.pathname.startsWith("/api/unsubscribe")
+    || request.nextUrl.pathname.startsWith("/contact")
+    || request.nextUrl.pathname === "/api/contact"
+    || request.nextUrl.pathname === "/api/support-agent"
     || request.nextUrl.pathname === "/api/health";
   if (isPublic) return NextResponse.next();
 
@@ -45,6 +53,19 @@ export async function middleware(request: NextRequest) {
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     return NextResponse.redirect(login);
+  }
+
+  // After the free trial is used up, workspace pages send the user to pick a subscription.
+  const path = request.nextUrl.pathname;
+  const isPage = !path.startsWith("/api/");
+  if (isPage && !TRIAL_ENDED_ALLOWED.some((allowed) => path.startsWith(allowed))) {
+    const { data: status } = await supabase.rpc("get_trial_status");
+    if (mustSubscribe(status as TrialStatus | null)) {
+      const target = request.nextUrl.clone();
+      target.pathname = "/subscriptions";
+      target.search = "?trial=ended";
+      return NextResponse.redirect(target);
+    }
   }
   return response;
 }

@@ -61,7 +61,7 @@ export default function LoginPage() {
         <div className="-mt-1 text-right"><Link href="/forgot-password" className="text-[13px] font-semibold text-[#405fca] hover:underline">Forgot password?</Link></div>
         {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
         <button disabled={busy} className="h-11 w-full rounded-xl bg-gradient-to-r from-[#233a72] to-[#4a68d8] text-[14px] font-semibold text-white shadow-[0_12px_24px_-12px_rgba(54,82,177,.6)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_-12px_rgba(54,82,177,.55)] disabled:opacity-60">{busy ? "Please wait…" : "Sign in"}</button>
-      </form><div className="mt-5 text-center text-[14px] text-muted">New to MYMAILMARKET? <Link href="/pricing" className="font-semibold text-[#405fca] hover:underline">Choose a package</Link> before creating your account.</div>
+      </form><div className="mt-5 text-center text-[14px] text-muted">New to MYMAILMARKET? <Link href="/signup" className="font-semibold text-[#405fca] hover:underline">Start your free trial</Link> or <Link href="/pricing" className="font-semibold text-[#405fca] hover:underline">view packages</Link>.</div>
       <p className="mt-8 text-center text-[13px] leading-5 text-muted">By continuing, you agree to use this workspace in accordance with applicable email and privacy laws.</p>
       <Link href="/unsubscribe" className="mt-5 block text-center text-[13px] text-[#8994a9] hover:text-[#405fca]">Email preferences</Link>
     </div></div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { reserveCredits, settleCredits } from "@/lib/credits";
+import { claimTrial, getTrialStatus, releaseTrial, TRIAL_DISCOVERY_RESULTS, TRIAL_USED_MESSAGE } from "@/lib/trial";
 
 const requestSchema = z.object({
   domain: z.string().trim().min(3).max(253),
@@ -66,11 +67,26 @@ export async function POST(request: Request) {
 
   const apiKey = process.env.HUNTER_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "Domain search is not configured." }, { status: 503 });
+  // Accounts without a subscription get one free discovery, capped at a few results.
+  const trial = await getTrialStatus(supabase);
+  const isTrial = Boolean(trial && !trial.has_full_access);
+  const limit = isTrial ? Math.min(parsed.data.limit, TRIAL_DISCOVERY_RESULTS) : parsed.data.limit;
   const reservationKey = `domain-search:${user.id}:${crypto.randomUUID()}`;
-  const reservation = await reserveCredits(supabase, "email_discovery", parsed.data.limit, reservationKey, `Domain search: ${domain}`);
-  if (reservation.error) return NextResponse.json({ error: reservation.error }, { status: /credit|subscription|account/i.test(reservation.error) ? 402 : 500 });
+  if (isTrial) {
+    if (!trial?.trial_eligible || !trial.discovery_available) return NextResponse.json({ error: TRIAL_USED_MESSAGE, code: "trial_used" }, { status: 402 });
+    const claim = await claimTrial(supabase, "discovery");
+    if (claim.error) return NextResponse.json({ error: claim.error }, { status: 500 });
+    if (!claim.granted) return NextResponse.json({ error: TRIAL_USED_MESSAGE, code: "trial_used" }, { status: 402 });
+  } else {
+    const reservation = await reserveCredits(supabase, "email_discovery", limit, reservationKey, `Domain search: ${domain}`);
+    if (reservation.error) return NextResponse.json({ error: reservation.error }, { status: /credit|subscription|account/i.test(reservation.error) ? 402 : 500 });
+  }
+  // Settles paid credits, or for a trial gives the free discovery back when nothing was delivered.
+  const settle = (consumed: number) => isTrial
+    ? (consumed === 0 ? releaseTrial(user.id, "discovery") : Promise.resolve(null))
+    : settleCredits(user.id, reservationKey, consumed);
 
-  const searchParams = new URLSearchParams({ domain, limit: String(parsed.data.limit) });
+  const searchParams = new URLSearchParams({ domain, limit: String(limit) });
   if (parsed.data.type) searchParams.set("type", parsed.data.type);
 
   let response: Response;
@@ -81,7 +97,7 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(15000),
     });
   } catch {
-    const refundError = await settleCredits(user.id, reservationKey, 0);
+    const refundError = await settle(0);
     return NextResponse.json({ error: `Domain search is temporarily unavailable. Please try again.${refundError ? ` Credit release failed: ${refundError}` : ""}` }, { status: refundError ? 500 : 502 });
   }
   const result = await response.json().catch(() => null) as HunterDomainResponse | null;
@@ -90,7 +106,7 @@ export async function POST(request: Request) {
     const message = response.status === 401 ? "Domain search rejected its configured credentials."
       : response.status === 429 || response.status === 403 ? "Domain search usage limit reached."
       : providerMessage ?? "Could not complete this domain search.";
-    const refundError = await settleCredits(user.id, reservationKey, 0);
+    const refundError = await settle(0);
     return NextResponse.json({ error: `${message}${refundError ? ` Credit release failed: ${refundError}` : ""}` }, { status: refundError ? 500 : response.status === 429 ? 429 : 502 });
   }
 
@@ -130,13 +146,13 @@ export async function POST(request: Request) {
     .upsert(rows, { onConflict: "user_id,email", ignoreDuplicates: true })
     .select("id,lead_score,email_status");
     if (error) {
-      const refundError = await settleCredits(user.id, reservationKey, 0);
+      const refundError = await settle(0);
       return NextResponse.json({ error: `${error.message}${refundError ? ` Credit release failed: ${refundError}` : ""}` }, { status: 500 });
     }
     inserted = data;
   }
-  const consumed = Math.min(parsed.data.limit, providerEmails.length);
-  const settlementError = await settleCredits(user.id, reservationKey, consumed);
+  const consumed = Math.min(limit, providerEmails.length);
+  const settlementError = await settle(consumed);
   if (settlementError) return NextResponse.json({ error: `Search completed but credit settlement failed: ${settlementError}` }, { status: 500 });
 
   return NextResponse.json({

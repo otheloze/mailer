@@ -14,6 +14,7 @@ const navItems: { label: string; href: string; external?: boolean }[] = [
   { label: "Hosting", href: HOSTING_STORE_URL, external: true },
   { label: "Domains", href: "/domains/buy" },
   { label: "Pricing", href: "/pricing" },
+  { label: "Support", href: "/contact" },
 ];
 
 function NavLink({ item, className, activeClassName }: { item: typeof navItems[number]; className: string; activeClassName: string }) {
@@ -50,7 +51,7 @@ export function SiteHeader() {
         </nav>
         <div className="flex items-center gap-3">
           <Link href="/login" className="hidden text-[14px] font-medium text-[#475569] transition hover:text-[#111827] sm:inline">Sign in</Link>
-          <Link href="/pricing" className="inline-flex h-10 items-center gap-2 rounded-full bg-[#162544] px-4 text-[14px] font-semibold text-white shadow-[0_8px_20px_-12px_rgba(13,28,58,.65)] transition hover:-translate-y-0.5 hover:bg-[#243c70] sm:px-5">
+          <Link href="/signup" className="inline-flex h-10 items-center gap-2 rounded-full bg-[#162544] px-4 text-[14px] font-semibold text-white shadow-[0_8px_20px_-12px_rgba(13,28,58,.65)] transition hover:-translate-y-0.5 hover:bg-[#243c70] sm:px-5">
             Get started <ArrowUpRight size={14} />
           </Link>
         </div>
@@ -89,6 +90,7 @@ export function SiteFooter() {
             <li><Link href="/login" className="hover:text-[#111827]">Sign in</Link></li>
             <li><Link href="/dashboard" className="hover:text-[#111827]">Workspace</Link></li>
             <li><Link href="/unsubscribe" className="hover:text-[#111827]">Email preferences</Link></li>
+            <li><Link href="/contact" className="hover:text-[#111827]">Contact &amp; support</Link></li>
           </ul></div>
         </div>
       </div>

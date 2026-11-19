@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SupportChat } from "@/components/support-chat";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://mymailmarket.com"),
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
         {children}
+        <SupportChat />
       </body>
     </html>
   );

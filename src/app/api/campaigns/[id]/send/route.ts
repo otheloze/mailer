@@ -56,10 +56,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!claim.granted) return NextResponse.json({ error: TRIAL_USED_MESSAGE, code: "trial_used" }, { status: 402 });
     try {
       const html = await renderCampaignEmail({ html: campaign.html, previewText: campaign.preview_text, companyName: null, mailingAddress: "" });
-      // Sent through Resend (not the cPanel mailbox) from the platform's own verified address,
-      // so a trial user cannot choose the sender and delivery reputation is Resend's.
+      // Sent through Resend from the sender chosen in the compose form when the account may use it
+      // (the shared platform address, or a domain an administrator confirmed for this account);
+      // otherwise from the platform's own verified address.
+      const trialSender = campaign.from_email && !senderDomainError(campaign.from_email, senderDomains) ? campaign.from_email : trialFrom;
       const { data: sent, error: sendError } = await getResend().emails.send({
-        from: `${campaign.from_name || "MYMAILMARKET"} <${trialFrom}>`,
+        from: `${campaign.from_name || "MYMAILMARKET"} <${trialSender}>`,
         to: [ownEmail],
         subject: `[Test] ${campaign.subject}`,
         html: html.replaceAll("{{{RESEND_UNSUBSCRIBE_URL}}}", `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/unsubscribe`),

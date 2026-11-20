@@ -4,6 +4,11 @@ import type { TrialAction, TrialStatus } from "@/lib/trial-shared";
 
 export * from "@/lib/trial-shared";
 
+/** Platform sender for trial test emails; must be on a Resend-verified domain. */
+export function trialFromAddress() {
+  return process.env.TRIAL_FROM_EMAIL || process.env.SUPPORT_FROM_EMAIL || process.env.ORDER_FROM_EMAIL || null;
+}
+
 export async function getTrialStatus(supabase: SupabaseClient): Promise<TrialStatus | null> {
   const { data, error } = await supabase.rpc("get_trial_status");
   if (error || !data) return null;

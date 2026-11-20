@@ -118,6 +118,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ accepted: true, id: sentId, warning: settlementError ? `Email accepted, but credit settlement failed: ${settlementError}` : undefined });
   }
 
+  // Free-trial accounts can send one test email but not campaigns; say so instead of surfacing the credit check.
+  const accessStatus = await getTrialStatus(supabase);
+  if (accessStatus && !accessStatus.has_full_access) {
+    return NextResponse.json({
+      error: "Sending to your audience needs a subscription. Your free trial includes one test email and one discovery. Choose a plan to send campaigns.",
+      code: "subscription_required",
+    }, { status: 402 });
+  }
   const limited = await rateLimitResponse(`campaign-send:${user.id}`, 20, 3600);
   if (limited) return limited;
   if (campaign.status !== "draft" && campaign.status !== "scheduled") return NextResponse.json({ error: "This campaign has already been sent or is being sent." }, { status: 409 });

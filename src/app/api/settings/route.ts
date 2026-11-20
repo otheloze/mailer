@@ -2,6 +2,7 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getResend } from "@/lib/resend";
+import { getAllowedSenderDomains, resolveSenderForSave } from "@/lib/sender-domains";
 
 const schema = z.object({
   full_name: z.string().max(120).default(""),
@@ -40,7 +41,9 @@ export async function PATCH(request: Request) {
   if (authError || !user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const input = schema.safeParse(await request.json().catch(() => null));
   if (!input.success) return NextResponse.json({ error: input.error.issues[0]?.message ?? "Invalid settings." }, { status: 400 });
-  const { data, error } = await supabase.from("profiles").upsert({ id: user.id, ...input.data, updated_at: new Date().toISOString() }).select("*").single();
+  const sender = await resolveSenderForSave(supabase, user.id, input.data.default_from_email);
+  if (sender.error) return NextResponse.json({ error: sender.error }, { status: sender.status });
+  const { data, error } = await supabase.from("profiles").upsert({ id: user.id, ...input.data, default_from_email: sender.fromEmail, updated_at: new Date().toISOString() }).select("*").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ profile: data });
 }
@@ -51,7 +54,11 @@ export async function POST() {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   if (!process.env.RESEND_API_KEY) return NextResponse.json({ error: "RESEND_API_KEY is not configured." }, { status: 503 });
+  // All workspaces share one Resend account, so only show the domains this user was granted.
+  const { domains: granted, error: grantError } = await getAllowedSenderDomains(supabase, user.id);
+  if (grantError) return NextResponse.json({ error: grantError }, { status: 500 });
   const { data, error } = await getResend().domains.list();
   if (error) return NextResponse.json({ error: error.message }, { status: 502 });
-  return NextResponse.json({ connected: true, domains: (data?.data ?? []).map((domain) => ({ id: domain.id, name: domain.name, status: domain.status })) });
+  const domains = (data?.data ?? []).filter((domain) => granted.has(domain.name.toLowerCase()));
+  return NextResponse.json({ connected: true, domains: domains.map((domain) => ({ id: domain.id, name: domain.name, status: domain.status })) });
 }

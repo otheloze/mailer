@@ -1,6 +1,6 @@
 import { QuickCompose } from "@/components/quick-compose";
 import { requireUser } from "@/lib/auth";
-import { getAllowedSenderDomains } from "@/lib/sender-domains";
+import { getAllowedSenderDomains, platformSender } from "@/lib/sender-domains";
 
 export const dynamic = "force-dynamic";
 
@@ -17,5 +17,6 @@ export default async function ComposePage() {
     defaults={profile.data ?? null}
     accountEmail={user.email ?? ""}
     senderDomains={[...senderDomains.domains].sort()}
+    platformSender={platformSender()}
   />;
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { resolveSenderForSave } from "@/lib/sender-domains";
 
 const schema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -31,7 +32,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (audienceError) return NextResponse.json({ error: audienceError.message }, { status: 500 });
     if (!audience) return NextResponse.json({ error: "Selected audience does not belong to this workspace." }, { status: 403 });
   }
-  const { data: campaign, error } = await supabase.from("campaigns").update({ ...input.data, updated_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id).select("*").single();
+  const sender = await resolveSenderForSave(supabase, user.id, input.data.from_email);
+  if (sender.error) return NextResponse.json({ error: sender.error }, { status: sender.status });
+  const { data: campaign, error } = await supabase.from("campaigns").update({ ...input.data, from_email: sender.fromEmail, updated_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id).select("*").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ campaign });
 }

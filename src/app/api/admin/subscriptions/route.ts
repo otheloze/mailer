@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { getResend } from "@/lib/resend";
 
 const userId = z.string().uuid();
 const senderDomain = z.string().trim().toLowerCase().max(253).regex(/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, "Enter a valid domain such as example.com.");
@@ -163,6 +164,14 @@ export async function POST(request: Request) {
     }
     case "grant_sender_domain": {
       targetUserId = parsed.data.userId; action = parsed.data.action; details = { domain: parsed.data.domain };
+      // Only domains confirmed (verified) in Resend can be granted, otherwise sends would fail.
+      const grantDomain = parsed.data.domain;
+      if (!process.env.RESEND_API_KEY) return NextResponse.json({ error: "RESEND_API_KEY is not configured, so the domain cannot be checked." }, { status: 503 });
+      const { data: resendDomains, error: resendError } = await getResend().domains.list();
+      if (resendError) return NextResponse.json({ error: `Could not check Resend: ${resendError.message}` }, { status: 502 });
+      const resendDomain = (resendDomains?.data ?? []).find((item) => item.name.toLowerCase() === grantDomain);
+      if (!resendDomain) return NextResponse.json({ error: `${grantDomain} is not added in Resend yet. Add and verify it in Resend first.` }, { status: 409 });
+      if (resendDomain.status !== "verified") return NextResponse.json({ error: `${grantDomain} is not verified in Resend yet (status: ${resendDomain.status}).` }, { status: 409 });
       const { error } = await admin.from("sender_domain_grants")
         .upsert({ user_id: targetUserId, domain: parsed.data.domain, granted_by: user.id }, { onConflict: "user_id,domain", ignoreDuplicates: true });
       operationError = error?.message ?? null;

@@ -8,6 +8,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowLeft, ArrowRight, Eye, GripVertical, Image as ImageIcon, Link2, Mail, Monitor, Plus, Send, Smartphone, Trash2, Type } from "lucide-react";
 import Link from "next/link";
+import { normalizeSender } from "@/lib/sender-domains";
 
 type Block = { id: string; type: "heading" | "text" | "image" | "button" | "divider" | "columns" | "social" | "html"; content: string; url?: string; color?: string; background?: string };
 type Audience = { id: string; name: string };
@@ -23,14 +24,16 @@ const starterBlocks: Block[] = [
   { id: "button", type: "button", content: "Explore what’s new", url: "https://example.com" },
 ];
 
-export function CampaignEditor({ campaign, audiences, defaults, template }: { campaign?: Campaign; audiences: Audience[]; defaults: Defaults; template?: Template }) {
+export function CampaignEditor({ campaign, audiences, defaults, template, senderDomains, platformSender }: { campaign?: Campaign; audiences: Audience[]; defaults: Defaults; template?: Template; senderDomains: string[]; platformSender: string }) {
+  // Without a confirmed domain the account sends from the shared platform address only.
+  const senderLocked = senderDomains.length === 0;
   const canEdit = !campaign || campaign.status === "draft" || campaign.status === "scheduled";
   const [id, setId] = useState(campaign?.id);
   const [name, setName] = useState(campaign?.name ?? (template ? `${template.name} campaign` : ""));
   const [subject, setSubject] = useState(campaign?.subject ?? template?.subject ?? "");
   const [previewText, setPreviewText] = useState(campaign?.preview_text ?? "");
   const [fromName, setFromName] = useState(campaign?.from_name || defaults?.default_from_name || "");
-  const [fromEmail, setFromEmail] = useState(campaign?.from_email || defaults?.default_from_email || "");
+  const [fromEmail, setFromEmail] = useState(normalizeSender(campaign?.from_email || defaults?.default_from_email, senderDomains, platformSender));
   const [replyTo, setReplyTo] = useState(campaign?.reply_to || defaults?.default_reply_to || "");
   const [audienceId, setAudienceId] = useState(campaign?.audience_id ?? "");
   const [blocks, setBlocks] = useState<Block[]>(campaign?.html || template?.html ? [{ id: "custom-html", type: "html", content: campaign?.html ?? template?.html ?? "" }] : starterBlocks);
@@ -129,7 +132,7 @@ export function CampaignEditor({ campaign, audiences, defaults, template }: { ca
             <Input label="Subject line" value={subject} onChange={setSubject} placeholder="What’s new this week?" disabled={!canEdit} />
             <Input label="Preview text" value={previewText} onChange={setPreviewText} placeholder="A short inbox preview…" disabled={!canEdit} />
             <Input label="Sender name" value={fromName} onChange={setFromName} placeholder="Your brand" disabled={!canEdit} />
-            <Input label="Sender email" value={fromEmail} onChange={setFromEmail} placeholder="hello@yourdomain.com" disabled={!canEdit} type="email" />
+            <Input label={senderLocked ? "Sender email (shared address — ask us to confirm your own domain to change it)" : "Sender email"} value={fromEmail} onChange={setFromEmail} placeholder="hello@yourdomain.com" disabled={!canEdit || senderLocked} type="email" />
             <Input label="Reply-to address" value={replyTo} onChange={setReplyTo} placeholder="Optional" disabled={!canEdit} type="email" />
             <AudienceCount audienceId={audienceId} />
           </div>

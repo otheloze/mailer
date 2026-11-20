@@ -7,7 +7,7 @@ import { getResend } from "@/lib/resend";
 import { hasCampaignBodyContent, renderCampaignEmail } from "@/lib/render-email";
 import { refundSettledCredits, reserveCredits, settleCredits } from "@/lib/credits";
 import { rateLimitResponse } from "@/lib/rate-limit";
-import { getAllowedSenderDomains, isDomainAllowed, senderDomainError } from "@/lib/sender-domains";
+import { getAllowedSenderDomains, isDomainAllowed, platformSender, senderDomainError } from "@/lib/sender-domains";
 import { claimTrial, getTrialStatus, releaseTrial, trialFromAddress, TRIAL_USED_MESSAGE } from "@/lib/trial";
 import { loadEligibleAddresses, reconcileSegment, storeResendContactId } from "@/lib/segments";
 
@@ -37,6 +37,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { domains: senderDomains, error: domainLookupError } = await getAllowedSenderDomains(supabase, user.id);
   if (domainLookupError) return NextResponse.json({ error: domainLookupError }, { status: 500 });
+  // Accounts without a confirmed domain send from the shared platform sender.
+  const fromEmail = campaign.from_email || platformSender();
 
   if (input.data.testEmail && isTrialSend) {
     const limited = await rateLimitResponse(`test-send:${user.id}`, 10, 3600);
@@ -76,8 +78,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (input.data.testEmail) {
     const limited = await rateLimitResponse(`test-send:${user.id}`, 10, 3600);
     if (limited) return limited;
-    if (!campaign.from_email || !campaign.subject || !campaign.html) return NextResponse.json({ error: "Add a sender, subject, and email design before sending a test." }, { status: 400 });
-    const domainError = senderDomainError(campaign.from_email, senderDomains);
+    if (!campaign.subject || !campaign.html) return NextResponse.json({ error: "Add a subject and email design before sending a test." }, { status: 400 });
+    const domainError = senderDomainError(fromEmail, senderDomains);
     if (domainError) return NextResponse.json({ error: domainError }, { status: 403 });
     // Test sends may only go to the account owner or to an address on the workspace's own approved domains.
     const testRecipient = input.data.testEmail;
@@ -98,7 +100,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     let sendErrorMessage: string | null = null;
     try {
       const { data: sent, error: sendError } = await getResend().emails.send({
-        from: `${campaign.from_name || "MYMAILMARKET"} <${campaign.from_email}>`,
+        from: `${campaign.from_name || "MYMAILMARKET"} <${fromEmail}>`,
         to: [testRecipient],
         subject: `[Test] ${campaign.subject}`,
         html: html.replaceAll("{{{RESEND_UNSUBSCRIBE_URL}}}", `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/unsubscribe`),
@@ -131,8 +133,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (campaign.status !== "draft" && campaign.status !== "scheduled") return NextResponse.json({ error: "This campaign has already been sent or is being sent." }, { status: 409 });
   if (campaign.status === "scheduled" && !input.data.scheduledAt) return NextResponse.json({ error: "Choose a new future time to update a scheduled campaign." }, { status: 400 });
   if (!campaign.audience_id) return NextResponse.json({ error: "Choose an audience before sending." }, { status: 400 });
-  if (!campaign.from_email || !campaign.subject || !campaign.html) return NextResponse.json({ error: "Add a sender, subject, and email design before sending." }, { status: 400 });
-  const domainError = senderDomainError(campaign.from_email, senderDomains);
+  if (!campaign.subject || !campaign.html) return NextResponse.json({ error: "Add a subject and email design before sending." }, { status: 400 });
+  const domainError = senderDomainError(fromEmail, senderDomains);
   if (domainError) return NextResponse.json({ error: domainError }, { status: 403 });
   if (!hasCampaignBodyContent(campaign.html)) return NextResponse.json({ error: "Add visible content to the email body before sending." }, { status: 400 });
   if (input.data.scheduledAt && Date.parse(input.data.scheduledAt) <= Date.now()) return NextResponse.json({ error: "Choose a future schedule time." }, { status: 400 });
@@ -240,7 +242,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const { data: broadcast, error: broadcastError } = await resend.broadcasts.create({
       segmentId,
-      from: `${campaign.from_name || "MYMAILMARKET"} <${campaign.from_email}>`,
+      from: `${campaign.from_name || "MYMAILMARKET"} <${fromEmail}>`,
       subject: campaign.subject,
       html,
       text: campaign.text_content || undefined,

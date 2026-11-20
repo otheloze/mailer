@@ -40,7 +40,7 @@ A self-hosted email marketing workspace built with Next.js, Supabase, Resend, Re
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes for webhooks and admin tools | Server-only key used by verified payment/email webhooks and role-checked admin routes |
 | `RESEND_API_KEY` | Yes for sending | Server-only Resend API key |
 | `RESEND_WEBHOOK_SECRET` | Yes for webhook processing | Resend webhook signing secret (`whsec_…`) |
-| `DEFAULT_SENDER_DOMAINS` | Recommended | Comma-separated sender domains every workspace may use (must be verified in Resend). Customer domains are granted per user in **Administration** |
+| `PLATFORM_SENDER_EMAIL` | Optional | Shared sender every workspace uses by default (default `mail@mymailmarket.com`; must be on a Resend-verified domain). Customers can change it only after an administrator grants them a verified domain in **Administration** |
 | `ORDER_FROM_EMAIL` | Optional | Sender for lead data order confirmations (on a Resend-verified domain) |
 | `ORDER_NOTIFICATION_EMAIL` | Optional | Receives an alert for every paid lead data order |
 | `NEXT_PUBLIC_PAYPAL_CLIENT_ID` | Yes for PayPal | Public PayPal app client ID |
@@ -133,7 +133,7 @@ Test emails use Resend's email send API. Campaign broadcasts use the Broadcast A
 - A contact can have multiple email addresses. Apply `supabase/migrations/202611110001_contact_email_addresses.sql`; subscription, consent, Resend identity, and suppression are tracked per email address. Campaigns and audience counts include only subscribed addresses with recorded consent.
 - Unsubscribed, bounced, and complained contacts are excluded from local recipient counts. Resend also applies its own suppression list to Broadcasts.
 - A company mailing address in **Settings** is required before marketing sends. Configure a verified sender domain in Resend.
-- Senders are restricted: a campaign or test email can only use a `from` address on `DEFAULT_SENDER_DOMAINS` or on a domain an administrator granted that user (**Administration → Approved sender domains**, stored in `sender_domain_grants`). Test emails can only go to the account's own email or an address on an approved domain.
+- Senders are restricted: a campaign or test email can only use the shared `PLATFORM_SENDER_EMAIL` address or an address on a domain an administrator granted that user (the domain must be verified in Resend) (**Administration → Approved sender domains**, stored in `sender_domain_grants`). Test emails can only go to the account's own email or an address on an approved domain.
 - Broadcasts are sent to the whole Resend Segment, so every send and every audience sync reconciles the Segment first: missing eligible addresses are added and anyone no longer eligible (unsubscribed, deleted, moved to another audience, or without consent) is removed. A send is aborted if an ineligible contact cannot be removed. Credits are charged only for addresses actually in the Segment and not unsubscribed at Resend.
 - Resend contacts and suppressions are account-wide. Because all workspaces share one Resend account, an unsubscribe, bounce, or complaint for an address applies to every workspace that holds that address, which mirrors what Resend itself enforces.
 - The deployment's Resend API key is shared by workspaces in that installation. For a public multi-tenant SaaS where customers supply separate Resend accounts, implement encrypted per-tenant credentials and stricter provider-account isolation before onboarding external customers.
@@ -161,7 +161,7 @@ Use Vercel Pro (campaign sends and audience syncs run for up to 300 seconds whil
    npx supabase db push
    ```
 
-4. **Vercel project.** Import the repository, select Node.js 20+, and add all variables from `.env.example` for each environment. Set `NEXT_PUBLIC_APP_URL=https://mymailmarket.com`, `PAYPAL_ENVIRONMENT=live`, and `DEFAULT_SENDER_DOMAINS`. Keep service-role, provider, webhook, Resend, Hunter, and Truehost secrets server-only (never `NEXT_PUBLIC_`).
+4. **Vercel project.** Import the repository, select Node.js 20+, and add all variables from `.env.example` for each environment. Set `NEXT_PUBLIC_APP_URL=https://mymailmarket.com`, `PAYPAL_ENVIRONMENT=live`. Keep service-role, provider, webhook, Resend, Hunter, and Truehost secrets server-only (never `NEXT_PUBLIC_`).
 5. **Domain and email authentication.** Attach `mymailmarket.com` in Vercel. In Resend, verify a dedicated sending subdomain (for example `mail.mymailmarket.com`) with SPF, DKIM, and a DMARC record, so campaign reputation does not affect your primary domain.
 6. **Auth.** Add `https://mymailmarket.com/auth/callback` to Supabase Auth's redirect URLs, configure a custom SMTP provider for Supabase Auth emails (the built-in sender is heavily rate-limited), and decide whether public sign-up stays enabled (`NEXT_PUBLIC_ALLOW_SIGNUP` plus the Supabase setting).
 7. **Webhooks.** Configure Resend at `https://mymailmarket.com/api/webhooks/resend`, PayPal at `https://mymailmarket.com/api/webhooks/paypal` (`PAYMENT.CAPTURE.COMPLETED`), and Paystack at `https://mymailmarket.com/api/webhooks/paystack` (`charge.success`). Send a test event from each dashboard.

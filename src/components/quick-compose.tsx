@@ -7,6 +7,7 @@ import {
   Mail, PenSquare, Send, Trash2, UsersRound, X,
 } from "lucide-react";
 import { composeEmailHtml, composeEmailText, composePreviewText } from "@/lib/compose-email";
+import { isSenderAllowed, normalizeSender } from "@/lib/sender-domains";
 
 type Audience = { id: string; name: string };
 type Defaults = {
@@ -21,16 +22,19 @@ type Defaults = {
 
 type Sent = { campaignId: string; scheduledAt: string | null; recipients: number; warning?: string };
 
-export function QuickCompose({ audiences, defaults, accountEmail, senderDomains }: {
+export function QuickCompose({ audiences, defaults, accountEmail, senderDomains, platformSender }: {
   audiences: Audience[];
   defaults: Defaults;
   accountEmail: string;
   senderDomains: string[];
+  platformSender: string;
 }) {
   const [campaignId, setCampaignId] = useState<string | undefined>();
   const [audienceId, setAudienceId] = useState(audiences.length === 1 ? audiences[0].id : "");
   const [fromName, setFromName] = useState(defaults?.default_from_name ?? defaults?.company_name ?? "");
-  const [fromEmail, setFromEmail] = useState(defaults?.default_from_email ?? "");
+  const [fromEmail, setFromEmail] = useState(normalizeSender(defaults?.default_from_email, senderDomains, platformSender));
+  // Without a confirmed domain the account sends from the shared platform address only.
+  const senderLocked = senderDomains.length === 0;
   const [replyTo, setReplyTo] = useState(defaults?.default_reply_to ?? "");
   const [showReplyTo, setShowReplyTo] = useState(Boolean(defaults?.default_reply_to));
   const [subject, setSubject] = useState("");
@@ -48,9 +52,8 @@ export function QuickCompose({ audiences, defaults, accountEmail, senderDomains 
   const footer = [defaults?.company_name, defaults?.email_footer].filter(Boolean).join(" · ");
   const html = useMemo(() => composeEmailHtml({ body, footer, brandColor: defaults?.brand_color ?? undefined }), [body, footer, defaults?.brand_color]);
   const audienceName = audiences.find((item) => item.id === audienceId)?.name ?? "";
-  const fromDomain = fromEmail.split("@")[1]?.toLowerCase() ?? "";
-  const domainWarning = senderDomains.length && fromDomain && !senderDomains.includes(fromDomain)
-    ? `Use an approved sender domain: ${senderDomains.join(", ")}`
+  const domainWarning = !senderLocked && fromEmail.trim() && !isSenderAllowed(fromEmail, new Set(senderDomains), platformSender)
+    ? `Use ${platformSender} or an address on your confirmed domain: ${senderDomains.join(", ")}`
     : "";
   const missingAddress = !defaults?.email_footer?.trim();
   const dirty = Boolean(subject.trim() || body.trim());
@@ -241,10 +244,11 @@ export function QuickCompose({ audiences, defaults, accountEmail, senderDomains 
       <div className={field}>
         <span className={label}>From</span>
         <input value={fromName} onChange={(event) => setFromName(event.target.value)} placeholder="Your name or brand" aria-label="Sender name" className={`${input} max-w-[200px]`} />
-        <input value={fromEmail} onChange={(event) => setFromEmail(event.target.value)} placeholder="hello@yourdomain.com" type="email" aria-label="Sender email" list="sender-domains" className={input} />
-        <datalist id="sender-domains">{senderDomains.map((domain) => <option key={domain} value={`hello@${domain}`} />)}</datalist>
+        <input value={fromEmail} onChange={(event) => setFromEmail(event.target.value)} placeholder="hello@yourdomain.com" type="email" aria-label="Sender email" list="sender-domains" readOnly={senderLocked} title={senderLocked ? "Shared sender. Ask us to confirm your own domain to change it." : undefined} className={`${input}${senderLocked ? " cursor-not-allowed text-muted" : ""}`} />
+        <datalist id="sender-domains"><option value={platformSender} />{senderDomains.map((domain) => <option key={domain} value={`hello@${domain}`} />)}</datalist>
         {!showReplyTo && <button type="button" onClick={() => setShowReplyTo(true)} className="shrink-0 text-[13px] text-muted hover:text-ink dark:hover:text-white">Reply-to</button>}
       </div>
+      {senderLocked && <div className="border-b border-line px-5 py-2 text-[12px] text-muted dark:border-[#2a3550]">Sending from the shared MYMAILMARKET address. To send from your own domain, ask us to confirm it first.</div>}
       {domainWarning && <div className="border-b border-line bg-amber-50 px-5 py-2 text-[13px] text-amber-900 dark:border-[#2a3550]">{domainWarning}</div>}
       {showReplyTo && <div className={field}>
         <span className={label}>Reply-to</span>

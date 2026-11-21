@@ -6,8 +6,9 @@ import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { HOSTING_STORE_URL } from "@/lib/links";
 
 export const metadata = {
-  title: "Domain search and pricing | MYMAILMARKET",
+  title: "Domain search and pricing",
   description: "Search live domain availability and view registration quotes from Truehost.",
+  alternates: { canonical: "/domains/buy" },
 };
 
 type SearchParams = { domain?: string };

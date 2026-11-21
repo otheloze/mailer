@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { PricingPage } from "@/components/pricing-page";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -9,6 +10,12 @@ type SearchParams = {
   trxref?: string;
   token?: string;
   claim_error?: string;
+};
+
+export const metadata: Metadata = {
+  title: "Pricing and email packages",
+  description: "Compare MYMAILMARKET email marketing packages and pick the plan that fits your list size. Pay securely with PayPal or Paystack.",
+  alternates: { canonical: "/pricing" },
 };
 
 export default async function Pricing({ searchParams }: { searchParams: Promise<SearchParams> }) {

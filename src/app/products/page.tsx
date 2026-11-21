@@ -5,8 +5,9 @@ import { ArrowRight, ArrowUpRight, BadgeCheck, Check, Globe2, Inbox, Mail, Searc
 import { HOSTING_STORE_URL, SiteFooter, SiteHeader } from "@/components/site-chrome";
 
 export const metadata: Metadata = {
-  title: "Products and services | MYMAILMARKET",
+  title: "Products and services",
   description: "Email marketing, verified email discovery, lead data, web hosting, domains and mailbox membership from MYMAILMARKET.",
+  alternates: { canonical: "/products" },
 };
 
 type Service = {

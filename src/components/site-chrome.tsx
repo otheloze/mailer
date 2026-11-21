@@ -91,6 +91,7 @@ export function SiteFooter() {
             <li><Link href="/dashboard" className="hover:text-[#111827]">Workspace</Link></li>
             <li><Link href="/unsubscribe" className="hover:text-[#111827]">Email preferences</Link></li>
             <li><Link href="/contact" className="hover:text-[#111827]">Contact &amp; support</Link></li>
+            <li><Link href="/privacy" className="hover:text-[#111827]">Privacy policy</Link></li>
           </ul></div>
         </div>
       </div>

@@ -4,8 +4,9 @@ import { AuthCard } from "@/components/auth-card";
 import { SignupForm } from "@/components/signup-form";
 
 export const metadata: Metadata = {
-  title: "Start your free trial | MYMAILMARKET",
+  title: "Start your free trial",
   description: "Create a free account and try one test email and one email discovery before choosing a plan.",
+  alternates: { canonical: "/signup" },
 };
 
 export default function SignupPage() {

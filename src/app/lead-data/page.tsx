@@ -6,8 +6,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Verified email lead data | MYMAILMARKET",
+  title: "Verified email lead data",
   description: "Buy verified business email leads in packages of 10,000 to 100,000. Pay with PayPal or Paystack.",
+  alternates: { canonical: "/lead-data" },
 };
 
 type SearchParams = { checkout?: string; reference?: string; trxref?: string; token?: string };

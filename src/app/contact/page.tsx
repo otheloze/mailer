@@ -5,8 +5,9 @@ import { ContactForm } from "@/components/contact-form";
 import { SUPPORT_EMAIL } from "@/lib/support";
 
 export const metadata: Metadata = {
-  title: "Contact and support | MYMAILMARKET",
+  title: "Contact and support",
   description: "Get help with email campaigns, lead data, domains and hosting. Send us a message or chat with our support assistant.",
+  alternates: { canonical: "/contact" },
 };
 
 export default function ContactPage() {

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+  <title>MYMAILMARKET — offline</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f7f8fb; color: #17233d; font: 15px/1.6 "Segoe UI", system-ui, sans-serif; }
+    main { max-width: 420px; padding: 32px; text-align: center; }
+    .logo { width: 56px; height: 56px; margin: 0 auto 20px; border-radius: 16px; background: linear-gradient(135deg, #78a8ff, #4057db); display: grid; place-items: center; color: #fff; font-size: 28px; }
+    h1 { margin: 0 0 8px; font-size: 22px; letter-spacing: -.02em; }
+    p { margin: 0 0 24px; color: #64748b; }
+    button { height: 42px; padding: 0 22px; border: 0; border-radius: 999px; background: #162544; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+    button:hover { background: #243c70; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="logo">⚡</div>
+    <h1>Can't reach MYMAILMARKET</h1>
+    <p>Check your internet connection, then try again. Your campaigns and contacts are safe on mymailmarket.com.</p>
+    <button id="retry" type="button">Try again</button>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const target = params.get("retry");
+    const safe = target && /^https:\/\/(www\.)?mymailmarket\.com(\/|$)/.test(target) ? target : "https://mymailmarket.com/dashboard";
+    document.getElementById("retry").addEventListener("click", () => { location.href = safe; });
+  </script>
+</body>
+</html>

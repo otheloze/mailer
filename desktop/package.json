@@ -1,0 +1,24 @@
+{
+  "name": "mymailmarket-desktop",
+  "productName": "MYMAILMARKET",
+  "version": "1.0.0",
+  "description": "MYMAILMARKET email marketing for Windows desktop.",
+  "author": "MYMAILMARKET",
+  "homepage": "https://mymailmarket.com",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
+    "start": "node start.js",
+    "icon": "powershell -NoProfile -ExecutionPolicy Bypass -File build/make-icon.ps1",
+    "dist": "electron-builder --win --publish never",
+    "release": "electron-builder --win --publish always"
+  },
+  "devDependencies": {
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
+}

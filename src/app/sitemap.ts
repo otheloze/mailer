@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 const SITE_URL = "https://mymailmarket.com";
-const PUBLIC_PATHS = ["/", "/pricing", "/products", "/lead-data", "/domains/buy", "/contact", "/signup", "/privacy"];
+const PUBLIC_PATHS = ["/", "/pricing", "/products", "/lead-data", "/domains/buy", "/contact", "/download", "/signup", "/privacy"];
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return PUBLIC_PATHS.map((path) => ({

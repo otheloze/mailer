@@ -24,6 +24,7 @@ export async function middleware(request: NextRequest) {
     || request.nextUrl.pathname.startsWith("/api/webhooks")
     || request.nextUrl.pathname.startsWith("/api/unsubscribe")
     || request.nextUrl.pathname.startsWith("/contact")
+    || request.nextUrl.pathname.startsWith("/download")
     || request.nextUrl.pathname === "/robots.txt"
     || request.nextUrl.pathname === "/sitemap.xml"
     || request.nextUrl.pathname === "/api/contact"

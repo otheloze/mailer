@@ -1,0 +1,33 @@
+name: Desktop release
+
+# Push a tag like desktop-v1.0.1 to build the Windows installer and publish it
+# to the public otheloze/mymailmarket-desktop releases repo. Installed apps
+# pick up the new version automatically.
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: desktop
+    env:
+      # Personal access token with Contents: write on otheloze/mymailmarket-desktop.
+      GH_TOKEN: ${{ secrets.DESKTOP_RELEASE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#desktop-v}" --no-git-tag-version --allow-same-version
+      - run: npm run release

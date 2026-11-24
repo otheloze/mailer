@@ -14,6 +14,7 @@ const navItems: { label: string; href: string; external?: boolean }[] = [
   { label: "Hosting", href: HOSTING_STORE_URL, external: true },
   { label: "Domains", href: "/domains/buy" },
   { label: "Pricing", href: "/pricing" },
+  { label: "Desktop app", href: "/download" },
   { label: "Support", href: "/contact" },
 ];
 
@@ -80,6 +81,7 @@ export function SiteFooter() {
             <li><Link href="/lead-data" className="hover:text-[#111827]">Verified lead data</Link></li>
             <li><a href={HOSTING_STORE_URL} target="_blank" rel="noreferrer" className="hover:text-[#111827]">Web hosting</a></li>
             <li><Link href="/domains/buy" className="hover:text-[#111827]">Domains</Link></li>
+            <li><Link href="/download" className="hover:text-[#111827]">Desktop app</Link></li>
           </ul></div>
           <div><div className="mb-3 font-semibold text-[#111827]">Buy</div><ul className="space-y-2 text-[#64748b]">
             <li><Link href="/pricing" className="hover:text-[#111827]">Email packages</Link></li>

@@ -1,0 +1,37 @@
+appId: com.mymailmarket.desktop
+productName: MYMAILMARKET
+copyright: Copyright © MYMAILMARKET
+
+directories:
+  output: dist
+  buildResources: build
+
+# Only the desktop sources are packaged, never the website's secrets or builds.
+files:
+  - main.js
+  - config.js
+  - offline.html
+  - build/icon.png
+  - package.json
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: MYMAILMARKET
+  # Fixed name so the website's "latest" download link never changes.
+  artifactName: MYMAILMARKET-Setup.${ext}
+
+publish:
+  provider: github
+  owner: otheloze
+  repo: mymailmarket-desktop
+  releaseType: release

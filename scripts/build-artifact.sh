@@ -52,7 +52,8 @@ find "$APP" -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} + 2>/de
 
 # node_modules is excluded because the bind-mounted copy is a Windows install
 # (wrong platform binaries); .next because it must be produced fresh; .git
-# because a build never reads it.
+# because a build never reads it; desktop/ because the Electron app is built
+# separately and its node_modules and installers are large.
 #
 # Every .env* file is excluded except the committed example: the build must see
 # exactly the variables passed in via --env-file. Staging .env.local would let
@@ -63,6 +64,7 @@ find "$APP" -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} + 2>/de
     --exclude=./node_modules \
     --exclude=./.next \
     --exclude=./.git \
+    --exclude=./desktop \
     --exclude=./.env \
     --exclude=./.env.local \
     --exclude=./.env.production \

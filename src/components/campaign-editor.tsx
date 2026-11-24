@@ -9,6 +9,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { ArrowLeft, ArrowRight, Eye, GripVertical, Image as ImageIcon, Link2, Mail, Monitor, Plus, Send, Smartphone, Trash2, Type } from "lucide-react";
 import Link from "next/link";
 import { normalizeSender } from "@/lib/sender-domains";
+import { useIsDesktopApp } from "@/lib/desktop-app";
+import { SendProgress } from "@/components/send-progress";
 
 type Block = { id: string; type: "heading" | "text" | "image" | "button" | "divider" | "columns" | "social" | "html"; content: string; url?: string; color?: string; background?: string };
 type Audience = { id: string; name: string };
@@ -47,6 +49,8 @@ export function CampaignEditor({ campaign, audiences, defaults, template, sender
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const desktop = useIsDesktopApp();
+  const showProgress = desktop && !!campaign && ["sending", "sent", "failed", "scheduled"].includes(campaign.status);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   const selected = blocks.find((block) => block.id === selectedId);
   const footer = [defaults?.company_name, defaults?.email_footer].filter(Boolean).join(" · ");
@@ -100,7 +104,8 @@ export function CampaignEditor({ campaign, audiences, defaults, template, sender
       const response = await fetch(`/api/campaigns/${campaignId}/send`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scheduledAt }) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error ?? "Could not send campaign.");
       setNotice(`${result.scheduledAt ? "Campaign scheduled with Resend." : `Resend accepted the broadcast for ${result.eligibleContacts} locally subscribed contacts. Delivery will be confirmed by webhook events.`}${result.warning ? ` ${result.warning}` : ""}`);
-      if (!result.scheduledAt) window.location.assign("/campaigns");
+      // The desktop app opens the campaign so its live sending progress is visible.
+      if (!result.scheduledAt) window.location.assign(desktop ? `/campaigns/${campaignId}` : "/campaigns");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not send campaign."); }
   }
 
@@ -122,6 +127,7 @@ export function CampaignEditor({ campaign, audiences, defaults, template, sender
         {campaign?.status === "scheduled" && <button onClick={() => void cancelScheduled()} className="h-9 rounded-lg border border-red-200 px-3 text-xs font-medium text-red-600">Cancel schedule</button>}
       </div>
     </div>
+    {showProgress && campaign && <div className="mb-4"><SendProgress campaignId={campaign.id} /></div>}
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-4">
         <section className="rounded-xl border border-line bg-white p-4 shadow-soft dark:border-[#2a2a27] dark:bg-[#171716]">

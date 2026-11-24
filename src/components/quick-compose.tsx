@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { composeEmailHtml, composeEmailText, composePreviewText } from "@/lib/compose-email";
 import { isSenderAllowed, normalizeSender } from "@/lib/sender-domains";
+import { useIsDesktopApp } from "@/lib/desktop-app";
+import { SendProgress } from "@/components/send-progress";
 
 type Audience = { id: string; name: string };
 type Defaults = {
@@ -30,6 +32,7 @@ export function QuickCompose({ audiences, defaults, accountEmail, senderDomains,
   platformSender: string;
 }) {
   const [campaignId, setCampaignId] = useState<string | undefined>();
+  const desktop = useIsDesktopApp();
   const [audienceId, setAudienceId] = useState(audiences.length === 1 ? audiences[0].id : "");
   const [fromName, setFromName] = useState(defaults?.default_from_name ?? defaults?.company_name ?? "");
   const [fromEmail, setFromEmail] = useState(normalizeSender(defaults?.default_from_email, senderDomains, platformSender));
@@ -196,7 +199,9 @@ export function QuickCompose({ audiences, defaults, accountEmail, senderDomains,
   }
 
   if (sent) {
-    return <div className="mx-auto max-w-[620px] rounded-2xl border border-line bg-white p-8 text-center shadow-soft dark:border-[#2a3550] dark:bg-[#17233d]">
+    // In the desktop app an immediate send also shows live progress under the confirmation.
+    const liveProgress = desktop && !sent.scheduledAt;
+    return <div className={liveProgress ? "mx-auto max-w-[980px] space-y-4" : ""}><div className="mx-auto max-w-[620px] rounded-2xl border border-line bg-white p-8 text-center shadow-soft dark:border-[#2a3550] dark:bg-[#17233d]">
       <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"><CheckCircle2 size={22} /></div>
       <h1 className="mt-4 text-[22px] font-semibold tracking-[-.04em]">{sent.scheduledAt ? "Message scheduled" : "Message on its way"}</h1>
       <p className="mt-2 text-[14px] leading-6 text-muted">
@@ -210,6 +215,8 @@ export function QuickCompose({ audiences, defaults, accountEmail, senderDomains,
         <Link href={`/campaigns/${sent.campaignId}`} className="inline-flex h-10 items-center rounded-xl border border-line px-4 text-[14px] font-medium dark:border-[#30302d]">View details</Link>
         <Link href="/campaigns" className="inline-flex h-10 items-center rounded-xl border border-line px-4 text-[14px] font-medium dark:border-[#30302d]">All campaigns</Link>
       </div>
+    </div>
+    {liveProgress && <SendProgress campaignId={sent.campaignId} />}
     </div>;
   }
 

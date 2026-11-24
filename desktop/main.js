@@ -2,7 +2,7 @@ const { app, BrowserWindow, Menu, shell, dialog, session } = require("electron")
 const path = require("node:path");
 const fs = require("node:fs");
 const { autoUpdater } = require("electron-updater");
-const { APP_URL, START_URL, APP_HOSTS, PAYMENT_HOSTS } = require("./config");
+const { APP_URL, START_URL, APP_HOSTS, PAYMENT_HOSTS, ALLOW_HTTP } = require("./config");
 
 const PARTITION = "persist:mymailmarket";
 let mainWindow = null;
@@ -18,7 +18,8 @@ function parse(url) {
 
 function isAppUrl(url) {
   const parsed = parse(url);
-  return !!parsed && parsed.protocol === "https:" && hostMatches(parsed.hostname, APP_HOSTS);
+  const secure = parsed?.protocol === "https:" || (ALLOW_HTTP && parsed?.protocol === "http:");
+  return !!parsed && secure && hostMatches(parsed.hostname, APP_HOSTS);
 }
 
 function isPaymentUrl(url) {
@@ -164,6 +165,7 @@ function buildMenu() {
       label: "Help",
       submenu: [
         { label: "Support", click: () => go(`${APP_URL}/contact`) },
+        { label: "Privacy policy", click: () => go(`${APP_URL}/privacy`) },
         { label: "Check for updates", click: () => checkForUpdates(true) },
         { label: `About MYMAILMARKET ${app.getVersion()}`, click: () => dialog.showMessageBox({ type: "info", title: "MYMAILMARKET", message: `MYMAILMARKET Desktop ${app.getVersion()}`, detail: APP_URL }) },
       ],
@@ -194,6 +196,9 @@ if (!app.requestSingleInstanceLock()) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
   });
+
+  // Lets the website recognise the app and switch on desktop-only features.
+  app.userAgentFallback = `${app.userAgentFallback} MYMAILMARKETDesktop/${app.getVersion()}`;
 
   app.whenReady().then(() => {
     // The site never needs camera, mic, location or notifications from the desktop shell.

@@ -24,7 +24,7 @@
   <script>
     const params = new URLSearchParams(location.search);
     const target = params.get("retry");
-    const safe = target && /^https:\/\/(www\.)?mymailmarket\.com(\/|$)/.test(target) ? target : "https://mymailmarket.com/dashboard";
+    const safe = target && /^(https:\/\/(www\.)?mymailmarket\.com|http:\/\/(localhost|127\.0\.0\.1):\d+)(\/|$)/.test(target) ? target : "https://mymailmarket.com/dashboard";
     document.getElementById("retry").addEventListener("click", () => { location.href = safe; });
   </script>
 </body>

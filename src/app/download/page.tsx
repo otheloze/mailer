@@ -48,7 +48,7 @@ export default function DownloadPage() {
             <li>Follow the installer. It adds MYMAILMARKET to your Start menu and desktop.</li>
             <li>Open the app and sign in with your MYMAILMARKET account. No account yet? <Link href="/signup" className="text-[#1e40af] underline">Sign up free</Link>.</li>
           </ol>
-          <p className="mt-4 text-[13px] text-[#64748b]">The app needs an internet connection. To remove it, use <em>Settings → Apps → Installed apps</em> in Windows.</p>
+          <p className="mt-4 text-[13px] text-[#64748b]">The app needs an internet connection. To remove it, use <em>Settings → Apps → Installed apps</em> in Windows. See what the app stores and connects to in our <Link href="/privacy#desktop-app" className="underline">privacy policy</Link>.</p>
         </section>
       </main>
       <SiteFooter />

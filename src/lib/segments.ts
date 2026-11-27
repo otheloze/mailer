@@ -65,6 +65,10 @@ export async function removeSegment(segmentId: string): Promise<string | null> {
   const { error } = await withResendRetry(() => getResend().segments.remove(segmentId));
   if (!error || isResendNotFound(error)) return null;
   if (!isResendLastSegment(error)) return error.message;
+  // Resend answers "last audience" before checking the id, so a Segment that is already gone lands here too.
+  const { error: getError } = await withResendRetry(() => getResend().segments.get(segmentId));
+  if (isResendNotFound(getError)) return null;
+  if (getError) return getError.message;
   try {
     const members = await listSegmentMembers(segmentId);
     const failed = await removeAddressesFromSegment(segmentId, members.map((member) => ({ email: member.email, resend_contact_id: member.id })));

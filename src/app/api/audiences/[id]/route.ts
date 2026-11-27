@@ -2,6 +2,7 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { removeSegment } from "@/lib/segments";
+import { settleFinishedCampaigns } from "@/lib/campaign-status";
 
 const schema = z.object({ deleteContacts: z.boolean().optional().default(false) });
 
@@ -20,9 +21,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (audienceError) return NextResponse.json({ error: audienceError.message }, { status: 500 });
   if (!audience) return NextResponse.json({ error: "Audience not found." }, { status: 404 });
 
-  const { data: busyCampaign, error: campaignError } = await supabase.from("campaigns")
-    .select("name,status").eq("user_id", user.id).eq("audience_id", id).in("status", ["scheduled", "sending"]).limit(1).maybeSingle();
+  const { data: busyRows, error: campaignError } = await supabase.from("campaigns")
+    .select("id,name,status,resend_broadcast_id").eq("user_id", user.id).eq("audience_id", id).in("status", ["scheduled", "sending"]);
   if (campaignError) return NextResponse.json({ error: campaignError.message }, { status: 500 });
+  const [busyCampaign] = await settleFinishedCampaigns(user.id, busyRows ?? []);
   if (busyCampaign) {
     return NextResponse.json({ error: `Campaign "${busyCampaign.name}" is ${busyCampaign.status} to this audience. Cancel it or let it finish before deleting the audience.` }, { status: 409 });
   }

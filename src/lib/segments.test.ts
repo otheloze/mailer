@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { planSegmentReconciliation, withResendRetry, type EligibleAddress } from "./segments";
+import { isResendNotFound, planSegmentReconciliation, withResendRetry, type EligibleAddress } from "./segments";
 
 const address = (email: string): EligibleAddress => ({ id: email, email, resendContactId: null, firstName: null, lastName: null });
 
@@ -52,5 +52,18 @@ describe("withResendRetry", () => {
   it("converts thrown errors into error results", async () => {
     const call = vi.fn().mockRejectedValue(new Error("network down"));
     expect((await withResendRetry(call)).error?.message).toBe("network down");
+  });
+});
+
+describe("isResendNotFound", () => {
+  it("treats 404s and not-found messages as already gone", () => {
+    expect(isResendNotFound({ message: "x", statusCode: 404 })).toBe(true);
+    expect(isResendNotFound({ message: "x", name: "not_found" })).toBe(true);
+    expect(isResendNotFound({ message: "Segment not found" })).toBe(true);
+  });
+
+  it("does not hide other errors", () => {
+    expect(isResendNotFound(null)).toBe(false);
+    expect(isResendNotFound({ message: "Invalid API key", statusCode: 401 })).toBe(false);
   });
 });

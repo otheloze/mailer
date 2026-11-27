@@ -2,6 +2,7 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getResend } from "@/lib/resend";
+import { removeAddressesFromSegment } from "@/lib/segments";
 
 const schema = z.object({
   firstName: z.string().max(100).nullable(),
@@ -66,14 +67,9 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       if (!process.env.RESEND_API_KEY) {
         return NextResponse.json({ error: "Configure RESEND_API_KEY to remove this contact from its connected audience before deletion." }, { status: 503 });
       }
-      for (const address of contact.contact_emails) {
-        const { error: removeError } = await getResend().contacts.segments.remove({
-          ...(address.resend_contact_id ? { contactId: address.resend_contact_id } : { email: address.email }),
-          segmentId: audience.resend_segment_id,
-        });
-        if (removeError) {
-          return NextResponse.json({ error: `Could not remove ${address.email} from its Resend Segment: ${removeError.message}. The contact was not deleted.` }, { status: 502 });
-        }
+      const [failure] = await removeAddressesFromSegment(audience.resend_segment_id, contact.contact_emails);
+      if (failure) {
+        return NextResponse.json({ error: `Could not remove ${failure.email} from its Resend Segment: ${failure.error}. The contact was not deleted.` }, { status: 502 });
       }
     }
   }

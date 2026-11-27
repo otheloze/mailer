@@ -46,6 +46,31 @@ export async function withResendRetry<T>(call: () => Promise<ProviderResult<T>>,
   return last;
 }
 
+/** True when Resend says the thing is already gone (deleted in the dashboard, or never there). */
+export function isResendNotFound(error: { message: string; statusCode?: number | null; name?: string } | null) {
+  if (!error) return false;
+  return error.statusCode === 404 || error.name === "not_found" || /not found|does not exist/i.test(error.message);
+}
+
+/** Deletes a Resend Segment; one that is already gone counts as deleted. */
+export async function removeSegment(segmentId: string) {
+  const { error } = await withResendRetry(() => getResend().segments.remove(segmentId));
+  return error && !isResendNotFound(error) ? error.message : null;
+}
+
+/** Takes each address out of a Segment; returns the addresses that could not be removed. */
+export async function removeAddressesFromSegment(segmentId: string, addresses: { email: string; resend_contact_id: string | null }[]) {
+  const failed: { email: string; error: string }[] = [];
+  await runPool(addresses, 10, async (address) => {
+    const { error } = await withResendRetry(() => getResend().contacts.segments.remove({
+      ...(address.resend_contact_id ? { contactId: address.resend_contact_id } : { email: address.email }),
+      segmentId,
+    }));
+    if (error && !isResendNotFound(error)) failed.push({ email: address.email, error: error.message });
+  });
+  return failed;
+}
+
 async function runPool<T>(items: T[], concurrency: number, worker: (item: T) => Promise<void>) {
   let index = 0;
   await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, async () => {

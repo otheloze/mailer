@@ -32,6 +32,9 @@ export function ContactsTable({ contacts: initial, totalCount: initialCount, aud
   const desktop = useIsDesktopApp();
   const [bulkOpen, setBulkOpen] = useState(false);
   const [visibleRows, setVisibleRows] = useState(ROW_RENDER_STEP);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [selectingAll, setSelectingAll] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const filtered = useMemo(() => contacts.filter((contact) => {
     const addresses = contact.contact_emails?.length ? contact.contact_emails : [{ email: contact.email, status: contact.status }];
     const matchesText = `${addresses.map((item) => item.email).join(" ")} ${contact.first_name ?? ""} ${contact.last_name ?? ""} ${contact.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase());
@@ -89,6 +92,39 @@ export function ContactsTable({ contacts: initial, totalCount: initialCount, aud
     }
   }
 
+  const shownRows = filtered.slice(0, visibleRows);
+  const allShownSelected = shownRows.length > 0 && shownRows.every((contact) => selected.has(contact.id));
+  function toggleShown() {
+    setSelected((previous) => {
+      const next = new Set(previous);
+      for (const contact of shownRows) { if (allShownSelected) next.delete(contact.id); else next.add(contact.id); }
+      return next;
+    });
+  }
+  function toggleOne(id: string) {
+    setSelected((previous) => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  }
+  async function selectEverything(thenDelete = false) {
+    setSelectingAll(true); setNotice("");
+    try {
+      const response = await fetch("/api/contacts/ids");
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not select every contact.");
+      setSelected(new Set(result.ids as string[]));
+      if (thenDelete && result.ids.length) setDeleteOpen(true);
+      if (!result.ids.length) setNotice("There are no contacts to delete.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not select every contact."); }
+    finally { setSelectingAll(false); }
+  }
+  function removeDeleted(ids: string[]) {
+    const gone = new Set(ids);
+    const loadedGone = contacts.filter((contact) => gone.has(contact.id)).length;
+    setContacts((previous) => previous.filter((contact) => !gone.has(contact.id)));
+    setTotalCount((total) => Math.max(0, total - ids.length));
+    setLoadedOffset((offset) => Math.max(0, offset - loadedGone));
+    setSelected((previous) => { const next = new Set(previous); ids.forEach((id) => next.delete(id)); return next; });
+  }
+
   async function importCsv(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]; if (!file) return;
     setBusy(true); setNotice("");
@@ -130,24 +166,31 @@ export function ContactsTable({ contacts: initial, totalCount: initialCount, aud
         <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-medium hover:bg-[#fafaf8] dark:border-[#30302d] dark:hover:bg-[#222220]"><Upload size={14} /> Import CSV<input type="file" accept=".csv,text/csv" className="hidden" onChange={importCsv} disabled={busy} /></label>
         <button onClick={() => void exportCsv()} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-medium hover:bg-[#fafaf8] dark:border-[#30302d] dark:hover:bg-[#222220]"><Download size={14} /> Export all</button>
         {desktop && <button onClick={() => setBulkOpen(true)} disabled={busy} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#bfd3fb] bg-[#eef3ff] px-3 text-xs font-medium text-[#1e40af] hover:bg-[#e0eaff] disabled:opacity-50 dark:border-[#2a3a60] dark:bg-[#1a2440] dark:text-[#bcd0ff]"><ListPlus size={14} /> Bulk add</button>}
+        <button onClick={() => void selectEverything(true)} disabled={busy || selectingAll || totalCount === 0} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-200 px-3 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-[#5a2a26] dark:text-[#f0a49c] dark:hover:bg-[#35201e]">{selectingAll ? <LoaderCircle size={14} className="animate-spin" /> : <Trash2 size={14} />} Delete all</button>
         <button onClick={() => setModal(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#1d4ed8] px-3 text-xs font-medium text-white hover:bg-[#1e40af]"><Plus size={14} /> Add contact</button>
       </div>
     </div>
     {notice && <div role="status" className="flex items-center justify-between border-b border-line bg-[#f7f6ff] px-4 py-2.5 text-xs text-[#1e40af] dark:border-[#2a2a27] dark:bg-[#211e30]"><span>{notice}</span><button aria-label="Dismiss" onClick={() => setNotice("")}><X size={14} /></button></div>}
+    {selected.size > 0 && <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-[#fbfbfa] px-4 py-2.5 text-xs dark:border-[#2a2a27] dark:bg-[#1b1b19]">
+      <span className="font-medium tabular-nums">{formatNumber(selected.size)} selected</span>
+      {selected.size < totalCount && <button onClick={() => void selectEverything()} disabled={selectingAll} className="font-medium text-[#1e40af] hover:underline disabled:opacity-50 dark:text-[#bcd0ff]">{selectingAll ? "Selecting…" : `Select all ${formatNumber(totalCount)} contacts`}</button>}
+      <button onClick={() => setSelected(new Set())} className="text-muted hover:underline">Clear</button>
+      <button onClick={() => setDeleteOpen(true)} className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 font-medium text-white hover:bg-red-700"><Trash2 size={13} /> Delete selected</button>
+    </div>}
     <div className="overflow-x-auto">
       <table className="w-full min-w-[820px] text-left">
-        <thead className="bg-[#fbfbfa] text-[13px] font-medium uppercase tracking-[.08em] text-[#94948d] dark:bg-[#1b1b19]"><tr><th className="px-5 py-3 font-medium">Contact</th><th className="px-4 py-3 font-medium">Address status</th><th className="px-4 py-3 font-medium">Consent</th><th className="px-4 py-3 font-medium">Audience</th><th className="px-4 py-3 font-medium">Tags</th><th className="px-4 py-3 text-right font-medium">Added</th><th className="px-3 py-3" /></tr></thead>
+        <thead className="bg-[#fbfbfa] text-[13px] font-medium uppercase tracking-[.08em] text-[#94948d] dark:bg-[#1b1b19]"><tr><th className="w-10 py-3 pl-5"><input type="checkbox" checked={allShownSelected} onChange={toggleShown} disabled={!shownRows.length} aria-label="Select all shown contacts" className="accent-[#1d4ed8]" /></th><th className="px-3 py-3 font-medium">Contact</th><th className="px-4 py-3 font-medium">Address status</th><th className="px-4 py-3 font-medium">Consent</th><th className="px-4 py-3 font-medium">Audience</th><th className="px-4 py-3 font-medium">Tags</th><th className="px-4 py-3 text-right font-medium">Added</th><th className="px-3 py-3" /></tr></thead>
         <tbody className="divide-y divide-line dark:divide-[#2a2a27]">
-          {filtered.slice(0, visibleRows).map((contact) => {
+          {shownRows.map((contact) => {
             const addresses = contact.contact_emails?.length ? contact.contact_emails : [{
               id: contact.email, email: contact.email, status: contact.status,
               consent_at: contact.consent_at ?? null, consent_source: contact.consent_source ?? null, is_primary: true,
             }];
             const statuses = [...new Set(addresses.map((address) => address.status))];
             const overallStatus = statuses.length > 1 ? "mixed" : statuses[0] ?? contact.status;
-            return <tr key={contact.id} className="transition hover:bg-[#fcfcfb] dark:hover:bg-[#1b1b19]"><td className="px-5 py-3"><div className="flex items-start gap-3"><span className="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-[#f1eee8] text-[13px] font-semibold text-[#726a58]">{(contact.first_name?.[0] ?? contact.email[0]).toUpperCase()}</span><div><div className="text-[14px] font-medium">{[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"}</div><div className="mt-1 space-y-1">{addresses.map((address) => <div key={address.id} className="flex flex-wrap items-center gap-1.5 text-[13px] text-muted"><span>{address.email}{address.is_primary ? " · Primary" : ""}</span><Status value={address.status} /></div>)}</div></div></div></td><td className="px-4 py-3"><Status value={overallStatus} /></td><td className="px-4 py-3 text-[13px] text-muted">{addresses.map((address) => <div key={address.id} title={address.consent_source ?? "No consent record"}>{address.consent_at ? new Date(address.consent_at).toLocaleDateString() : "—"}<div className="max-w-[120px] truncate text-[12px]">{address.consent_source || ""}</div></div>)}</td><td className="px-4 py-3 text-[14px] text-muted">{audiences.find((item) => item.id === contact.audience_id)?.name ?? "—"}</td><td className="px-4 py-3"><div className="flex gap-1">{contact.tags.slice(0, 3).map((tag) => <span key={tag} className="rounded-md bg-[#f3f3f0] px-2 py-1 text-[13px] text-[#71716b] dark:bg-[#282826] dark:text-[#d0d0ca]">{tag}</span>)}{contact.tags.length > 3 && <span className="px-1 text-[13px] text-muted">+{contact.tags.length - 3}</span>}</div></td><td className="px-4 py-3 text-right text-[14px] text-muted">{new Date(contact.created_at).toLocaleDateString()}</td><td className="px-3 py-3"><div className="flex items-center gap-1"><button onClick={() => setEditing(contact)} aria-label={`Edit ${contact.email}`} className="rounded-md p-1.5 text-muted hover:bg-[#f1f1ee] hover:text-ink dark:hover:bg-[#282826]"><Pencil size={13} /></button><button onClick={() => void deleteContact(contact)} disabled={deletingId === contact.id} aria-label={`Delete ${contact.email}`} title="Delete contact" className="rounded-md p-1.5 text-muted hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:hover:bg-[#35201e]">{deletingId === contact.id ? <LoaderCircle size={13} className="animate-spin" /> : <Trash2 size={13} />}</button></div></td></tr>;
+            return <tr key={contact.id} className={`transition hover:bg-[#fcfcfb] dark:hover:bg-[#1b1b19] ${selected.has(contact.id) ? "bg-[#f5f8ff] dark:bg-[#1a2033]" : ""}`}><td className="w-10 py-3 pl-5 align-top"><input type="checkbox" checked={selected.has(contact.id)} onChange={() => toggleOne(contact.id)} aria-label={`Select ${contact.email}`} className="mt-2.5 accent-[#1d4ed8]" /></td><td className="px-3 py-3"><div className="flex items-start gap-3"><span className="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-[#f1eee8] text-[13px] font-semibold text-[#726a58]">{(contact.first_name?.[0] ?? contact.email[0]).toUpperCase()}</span><div><div className="text-[14px] font-medium">{[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"}</div><div className="mt-1 space-y-1">{addresses.map((address) => <div key={address.id} className="flex flex-wrap items-center gap-1.5 text-[13px] text-muted"><span>{address.email}{address.is_primary ? " · Primary" : ""}</span><Status value={address.status} /></div>)}</div></div></div></td><td className="px-4 py-3"><Status value={overallStatus} /></td><td className="px-4 py-3 text-[13px] text-muted">{addresses.map((address) => <div key={address.id} title={address.consent_source ?? "No consent record"}>{address.consent_at ? new Date(address.consent_at).toLocaleDateString() : "—"}<div className="max-w-[120px] truncate text-[12px]">{address.consent_source || ""}</div></div>)}</td><td className="px-4 py-3 text-[14px] text-muted">{audiences.find((item) => item.id === contact.audience_id)?.name ?? "—"}</td><td className="px-4 py-3"><div className="flex gap-1">{contact.tags.slice(0, 3).map((tag) => <span key={tag} className="rounded-md bg-[#f3f3f0] px-2 py-1 text-[13px] text-[#71716b] dark:bg-[#282826] dark:text-[#d0d0ca]">{tag}</span>)}{contact.tags.length > 3 && <span className="px-1 text-[13px] text-muted">+{contact.tags.length - 3}</span>}</div></td><td className="px-4 py-3 text-right text-[14px] text-muted">{new Date(contact.created_at).toLocaleDateString()}</td><td className="px-3 py-3"><div className="flex items-center gap-1"><button onClick={() => setEditing(contact)} aria-label={`Edit ${contact.email}`} className="rounded-md p-1.5 text-muted hover:bg-[#f1f1ee] hover:text-ink dark:hover:bg-[#282826]"><Pencil size={13} /></button><button onClick={() => void deleteContact(contact)} disabled={deletingId === contact.id} aria-label={`Delete ${contact.email}`} title="Delete contact" className="rounded-md p-1.5 text-muted hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:hover:bg-[#35201e]">{deletingId === contact.id ? <LoaderCircle size={13} className="animate-spin" /> : <Trash2 size={13} />}</button></div></td></tr>;
           })}
-          {!filtered.length && <tr><td colSpan={7} className="px-5 py-16 text-center"><div className="text-[13px] font-medium">{contacts.length ? "No contacts match your filters" : "Your contact list is ready"}</div><div className="mt-1 text-[14px] text-muted">{contacts.length ? "Try a different search or status." : "Add a contact or import your existing subscribers."}</div></td></tr>}
+          {!filtered.length && <tr><td colSpan={8} className="px-5 py-16 text-center"><div className="text-[13px] font-medium">{contacts.length ? "No contacts match your filters" : "Your contact list is ready"}</div><div className="mt-1 text-[14px] text-muted">{contacts.length ? "Try a different search or status." : "Add a contact or import your existing subscribers."}</div></td></tr>}
         </tbody>
       </table>
     </div>
@@ -157,6 +200,7 @@ export function ContactsTable({ contacts: initial, totalCount: initialCount, aud
       <button disabled={busy} onClick={() => void loadMore()} className="h-8 rounded-lg border border-line px-3 text-[14px] font-medium disabled:opacity-50 dark:border-[#30302d]">{busy ? `Loading… ${formatNumber(contacts.length)} loaded` : `Load more contacts (${formatNumber(totalCount - contacts.length)} remaining)`}</button>
       {desktop && contacts.length < DESKTOP_MAX_BULK_CONTACTS && <button disabled={busy} onClick={() => void loadMore(true)} className="h-8 rounded-lg border border-[#bfd3fb] bg-[#eef3ff] px-3 text-[14px] font-medium text-[#1e40af] disabled:opacity-50 dark:border-[#2a3a60] dark:bg-[#1a2440] dark:text-[#bcd0ff]">Load all{totalCount > DESKTOP_MAX_BULK_CONTACTS ? ` (first ${formatNumber(DESKTOP_MAX_BULK_CONTACTS)})` : ""}</button>}
     </div>}
+    {deleteOpen && <DeleteContactsModal ids={[...selected]} close={() => setDeleteOpen(false)} removed={removeDeleted} finished={(summary) => setNotice(summary)} />}
     {bulkOpen && <BulkAddModal audiences={audiences} close={() => setBulkOpen(false)} added={(created, summary) => { setContacts((previous) => [...created, ...previous]); setTotalCount((total) => total + created.length); setLoadedOffset((offset) => offset + created.length); setNotice(summary); }} />}
     {modal && <ContactModal audiences={audiences} close={() => setModal(false)} created={(contact, warning) => { setContacts((previous) => [contact, ...previous]); setTotalCount((total) => total + 1); setLoadedOffset((offset) => offset + 1); setNotice(warning ?? "Contact added."); setModal(false); }} />}
     {editing && <ContactModal contact={editing} audiences={audiences} close={() => setEditing(null)} created={(updated, warning) => { setContacts((previous) => previous.map((contact) => contact.id === updated.id ? updated : contact)); setNotice(warning ?? "Contact updated."); setEditing(null); }} />}
@@ -286,6 +330,65 @@ function BulkAddModal({ audiences, close, added }: { audiences: Audience[]; clos
         <button disabled={running || !emails.length || overLimit} className="h-9 rounded-lg bg-[#1d4ed8] px-4 text-xs font-medium text-white disabled:opacity-60">{running ? "Adding…" : `Add ${formatNumber(emails.length)} contact${emails.length === 1 ? "" : "s"}`}</button>
       </div>
     </form>
+  </div>;
+}
+
+const DELETE_CHUNK = 50;
+
+function DeleteContactsModal({ ids, close, removed, finished }: { ids: string[]; close: () => void; removed: (ids: string[]) => void; finished: (summary: string) => void }) {
+  const [typed, setTyped] = useState("");
+  const [error, setError] = useState("");
+  const [progress, setProgress] = useState<{ done: number; deleted: number; failed: number; running: boolean } | null>(null);
+  const cancelled = useRef(false);
+  const needsTyping = ids.length > 100;
+  const running = !!progress?.running;
+
+  async function start() {
+    cancelled.current = false; setError("");
+    let deleted = 0; let done = 0; let failedRequest = false;
+    const failures: { email: string; error: string }[] = [];
+    setProgress({ done: 0, deleted: 0, failed: 0, running: true });
+    for (let offset = 0; offset < ids.length; offset += DELETE_CHUNK) {
+      if (cancelled.current) break;
+      const chunk = ids.slice(offset, offset + DELETE_CHUNK);
+      try {
+        const response = await fetch("/api/contacts/bulk-delete", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids: chunk }) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error ?? "Could not delete these contacts.");
+        deleted += result.deleted ?? 0; failures.push(...(result.failed ?? []));
+        if (result.deletedIds?.length) removed(result.deletedIds);
+      } catch (reason) {
+        failedRequest = true;
+        setError(`Stopped after deleting ${formatNumber(deleted)}: ${reason instanceof Error ? reason.message : "request failed."}`);
+        break;
+      }
+      done = Math.min(offset + chunk.length, ids.length);
+      setProgress({ done, deleted, failed: failures.length, running: true });
+    }
+    setProgress({ done, deleted, failed: failures.length, running: false });
+    const summary = `Deleted ${formatNumber(deleted)} contact${deleted === 1 ? "" : "s"}.${failures.length ? ` ${formatNumber(failures.length)} address${failures.length === 1 ? "" : "es"} could not leave their Resend Segment, so those contacts were kept (first: ${failures[0].email}, ${failures[0].error}).` : ""}${cancelled.current ? " Stopped before the end." : ""}`;
+    finished(summary);
+    if (!cancelled.current && !failedRequest && !failures.length) close();
+  }
+
+  const percent = progress ? Math.round((progress.done / ids.length) * 100) : 0;
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/35 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !running) close(); }}>
+    <div role="dialog" aria-modal="true" aria-labelledby="delete-contacts-title" className="w-full max-w-[460px] rounded-2xl border border-line bg-white p-5 shadow-xl dark:border-[#30302d] dark:bg-[#191918]">
+      <div className="flex items-start justify-between"><h2 id="delete-contacts-title" className="text-[16px] font-semibold">Delete {formatNumber(ids.length)} contact{ids.length === 1 ? "" : "s"}?</h2><button type="button" aria-label="Close" disabled={running} onClick={close} className="rounded-md p-1 text-muted disabled:opacity-40"><X size={17} /></button></div>
+      <p className="mt-2 text-[14px] leading-6 text-muted">They are removed from your contact list and from any Resend Segment they belong to. This can&apos;t be undone, so export your contacts first if you might need them.</p>
+      {needsTyping && !progress && <label className="mt-4 grid gap-1 text-[14px] font-medium text-[#686863]">Type DELETE to confirm<input value={typed} onChange={(event) => setTyped(event.target.value)} autoFocus className="h-9 rounded-lg border border-line bg-white px-3 font-mono text-xs outline-none focus:border-red-300 dark:border-[#30302d] dark:bg-[#222220]" /></label>}
+      {progress && <div className="mt-4">
+        <div className="flex justify-between text-[13px] text-muted tabular-nums"><span>{running ? "Deleting…" : "Finished"} {formatNumber(progress.done)} of {formatNumber(ids.length)}</span><span>{percent}%</span></div>
+        <div role="progressbar" aria-valuemin={0} aria-valuemax={ids.length} aria-valuenow={progress.done} className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-[#eef1f5] dark:bg-[#262624]"><div className="h-full rounded-full bg-red-600 transition-[width] duration-500" style={{ width: `${percent}%` }} /></div>
+        <div className="mt-1.5 text-[12px] text-muted tabular-nums">{formatNumber(progress.deleted)} deleted{progress.failed ? ` · ${formatNumber(progress.failed)} kept (Resend error)` : ""}</div>
+      </div>}
+      {error && <p role="alert" className="mt-3 text-xs text-red-600">{error}</p>}
+      <div className="mt-5 flex justify-end gap-2">
+        {running ? <button type="button" onClick={() => { cancelled.current = true; }} className="h-9 rounded-lg border border-red-200 px-3 text-xs font-medium text-red-600">Stop</button>
+          : <button type="button" onClick={close} className="h-9 rounded-lg border border-line px-3 text-xs font-medium dark:border-[#30302d]">{progress ? "Close" : "Cancel"}</button>}
+        {!progress && <button type="button" onClick={() => void start()} disabled={needsTyping && typed.trim() !== "DELETE"} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-4 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"><Trash2 size={13} /> Delete {formatNumber(ids.length)}</button>}
+      </div>
+    </div>
   </div>;
 }
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isResendNotFound, planSegmentReconciliation, withResendRetry, type EligibleAddress } from "./segments";
+import { isResendLastSegment, isResendNotFound, planSegmentReconciliation, withResendRetry, type EligibleAddress } from "./segments";
 
 const address = (email: string): EligibleAddress => ({ id: email, email, resendContactId: null, firstName: null, lastName: null });
 
@@ -65,5 +65,14 @@ describe("isResendNotFound", () => {
   it("does not hide other errors", () => {
     expect(isResendNotFound(null)).toBe(false);
     expect(isResendNotFound({ message: "Invalid API key", statusCode: 401 })).toBe(false);
+  });
+});
+
+describe("isResendLastSegment", () => {
+  it("spots Resend refusing to delete the account's last Segment", () => {
+    expect(isResendLastSegment({ message: "Cannot delete last audience." })).toBe(true);
+    expect(isResendLastSegment({ message: "Cannot delete last segment" })).toBe(true);
+    expect(isResendLastSegment({ message: "Invalid API key" })).toBe(false);
+    expect(isResendLastSegment(null)).toBe(false);
   });
 });

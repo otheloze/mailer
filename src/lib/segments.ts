@@ -52,10 +52,26 @@ export function isResendNotFound(error: { message: string; statusCode?: number |
   return error.statusCode === 404 || error.name === "not_found" || /not found|does not exist/i.test(error.message);
 }
 
-/** Deletes a Resend Segment; one that is already gone counts as deleted. */
-export async function removeSegment(segmentId: string) {
+/** True when Resend refuses because this is the account's only remaining Segment. */
+export function isResendLastSegment(error: { message: string } | null) {
+  return !!error && /last (audience|segment)/i.test(error.message);
+}
+
+/**
+ * Deletes a Resend Segment; one that is already gone counts as deleted.
+ * Resend never deletes an account's last Segment, so that one is emptied instead and left behind.
+ */
+export async function removeSegment(segmentId: string): Promise<string | null> {
   const { error } = await withResendRetry(() => getResend().segments.remove(segmentId));
-  return error && !isResendNotFound(error) ? error.message : null;
+  if (!error || isResendNotFound(error)) return null;
+  if (!isResendLastSegment(error)) return error.message;
+  try {
+    const members = await listSegmentMembers(segmentId);
+    const failed = await removeAddressesFromSegment(segmentId, members.map((member) => ({ email: member.email, resend_contact_id: member.id })));
+    return failed.length ? `could not empty the Segment (${failed[0].email}: ${failed[0].error})` : null;
+  } catch (reason) {
+    return reason instanceof Error ? reason.message : "could not empty the Segment";
+  }
 }
 
 /** Takes each address out of a Segment; returns the addresses that could not be removed. */
